@@ -117,7 +117,7 @@ IPC for debugging: `omarchy-shell omacorners status`
 * **No extra permissions.** The helper talks only to Hyprland's local request
   socket (`$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock`)
   for `cursorpos` and `j/monitors`. It never opens `/dev/input`, never injects
-  input, and never uses `sudo` / `pkexec`.
+  input, and never elevates privileges.
 * **No network.** No HTTP, no analytics, no remote dependencies.
 * **No shell interpolation.** Every action is a constant argv vector or a
   constant Hyprland dispatcher string. User-edited action ids that are not on
