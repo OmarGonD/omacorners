@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.omargond.hotcorners",
+  "name": "Hot Corners",
+  "version": "1.0.0",
+  "author": "OmarGonD",
+  "license": "MIT",
+  "description": "macOS-style hot corners for Omarchy: dwell in a screen corner to lock, show the desktop, open the menu, and more.",
+  "kinds": ["service", "overlay"],
+  "keepLoaded": false,
+  "entryPoints": {
+    "service": "HotCorners.qml",
+    "overlay": "Settings.qml"
+  }
+}

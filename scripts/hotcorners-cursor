@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Poll Hyprland cursor position over the compositor request socket.
+
+Prints `POS <x> <y>` to stdout whenever the pointer moves, plus a heartbeat
+`POS` while it is still, so the QML service can tell a live helper from a
+stuck one. No files are written. No other sockets are opened.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import socket
+import sys
+import time
+from typing import Any
+
+NEAR_EDGE_PX = 64
+IDLE_INTERVAL_S = 0.080
+NEAR_INTERVAL_S = 0.025
+MONITOR_REFRESH_S = 2.0
+HEARTBEAT_S = 0.5
+SOCKET_TIMEOUT_S = 0.4
+MAX_RESPONSE_BYTES = 256 * 1024
+
+
+def find_socket(env: dict[str, str] | None = None) -> str | None:
+    env = env if env is not None else os.environ
+    sig = str(env.get("HYPRLAND_INSTANCE_SIGNATURE") or "").strip()
+    if not sig or "/" in sig or ".." in sig or len(sig) > 256:
+        return None
+    runtime = str(env.get("XDG_RUNTIME_DIR") or "").strip()
+    candidates = []
+    if runtime and os.path.isabs(runtime):
+        candidates.append(os.path.join(runtime, "hypr", sig, ".socket.sock"))
+    candidates.append(os.path.join("/tmp/hypr", sig, ".socket.sock"))
+    for path in candidates:
+        if os.path.exists(path) and stat_is_socket(path):
+            return path
+    return None
+
+
+def stat_is_socket(path: str) -> bool:
+    try:
+        mode = os.stat(path).st_mode
+    except OSError:
+        return False
+    return (mode & 0o170000) == 0o140000
+
+
+def parse_cursorpos(text: str) -> tuple[int, int] | None:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    # Hyprland answers "x, y" or JSON {"x": N, "y": N}.
+    if raw[0] == "{":
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(obj, dict):
+            return None
+        try:
+            x = int(obj["x"])
+            y = int(obj["y"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        return x, y
+    parts = raw.replace(" ", "").split(",")
+    if len(parts) != 2:
+        return None
+    try:
+        return int(parts[0]), int(parts[1])
+    except ValueError:
+        return None
+
+
+def parse_monitors(text: str) -> list[dict[str, Any]]:
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in data[:16]:
+        if not isinstance(item, dict):
+            continue
+        try:
+            scale = float(item.get("scale") or 1.0)
+        except (TypeError, ValueError):
+            scale = 1.0
+        if scale <= 0:
+            scale = 1.0
+        try:
+            width = float(item.get("width") or 0)
+            height = float(item.get("height") or 0)
+            x = int(item.get("x") or 0)
+            y = int(item.get("y") or 0)
+        except (TypeError, ValueError):
+            continue
+        logical_w = int(round(width / scale))
+        logical_h = int(round(height / scale))
+        if logical_w <= 0 or logical_h <= 0:
+            continue
+        name = item.get("name")
+        out.append({
+            "name": str(name) if isinstance(name, str) else "",
+            "x": x,
+            "y": y,
+            "width": logical_w,
+            "height": logical_h,
+        })
+    return out
+
+
+def near_edge(x: int, y: int, monitors: list[dict[str, Any]], px: int = NEAR_EDGE_PX) -> bool:
+    margin = max(1, int(px))
+    for mon in monitors:
+        sx, sy = mon["x"], mon["y"]
+        sw, sh = mon["width"], mon["height"]
+        if x < sx or y < sy or x >= sx + sw or y >= sy + sh:
+            continue
+        if (x - sx <= margin or (sx + sw) - x <= margin
+                or y - sy <= margin or (sy + sh) - y <= margin):
+            return True
+    return False
+
+
+def hypr_request(path: str, command: str, timeout: float = SOCKET_TIMEOUT_S) -> bytes:
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(timeout)
+        sock.connect(path)
+        sock.sendall(command.encode("utf-8"))
+        chunks: list[bytes] = []
+        total = 0
+        while total <= MAX_RESPONSE_BYTES:
+            try:
+                chunk = sock.recv(min(4096, MAX_RESPONSE_BYTES + 1 - total))
+            except socket.timeout:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        if total > MAX_RESPONSE_BYTES:
+            return b""
+        return b"".join(chunks)
+    finally:
+        sock.close()
+
+
+def emit_pos(x: int, y: int) -> None:
+    sys.stdout.write(f"POS {x} {y}\n")
+    sys.stdout.flush()
+
+
+def main() -> int:
+    path = find_socket()
+    if not path:
+        sys.stderr.write("hotcorners-cursor: Hyprland request socket not found\n")
+        return 1
+
+    last_pos: tuple[int, int] | None = None
+    last_emit = 0.0
+    last_monitors_at = 0.0
+    monitors: list[dict[str, Any]] = []
+
+    while True:
+        now = time.monotonic()
+        if now - last_monitors_at >= MONITOR_REFRESH_S or not monitors:
+            raw_mon = hypr_request(path, "j/monitors")
+            parsed = parse_monitors(raw_mon.decode("utf-8", "replace"))
+            if parsed:
+                monitors = parsed
+            last_monitors_at = now
+
+        raw_pos = hypr_request(path, "cursorpos")
+        pos = parse_cursorpos(raw_pos.decode("utf-8", "replace"))
+        if pos is not None:
+            if pos != last_pos or now - last_emit >= HEARTBEAT_S:
+                emit_pos(pos[0], pos[1])
+                last_pos = pos
+                last_emit = now
+            interval = NEAR_INTERVAL_S if near_edge(pos[0], pos[1], monitors) else IDLE_INTERVAL_S
+        else:
+            interval = IDLE_INTERVAL_S
+        time.sleep(interval)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        raise SystemExit(0)
+    except BrokenPipeError:
+        raise SystemExit(0)
