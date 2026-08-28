@@ -84,6 +84,12 @@ class ClientMatchTests(unittest.TestCase):
         self.assertEqual(find(raw, "google-chrome", "2"), "0xbbbb")
         self.assertEqual(find(raw, "google-chrome", "9"), "0xaaaa")
 
+    def test_lua_focus_dispatchers(self):
+        self.assertIn('hl.dsp.focus({ window = "address:', ACTIONS)
+        self.assertIn('hl.dsp.focus({ workspace = "', ACTIONS)
+        self.assertIn("function classicToLua(", ACTIONS)
+        self.assertIn('hl.dsp.workspace.toggle_special("omacorners")', ACTIONS)
+
     def test_js_exports_find_client_address(self):
         self.assertIn("function findClientAddress(", ACTIONS)
         self.assertIn("function findClient(", ACTIONS)

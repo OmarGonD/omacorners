@@ -148,6 +148,10 @@ function isWorkspaceKey(key) {
   return typeof key === "string" && WORKSPACE_KEY.test(key)
 }
 
+function isRelativeWorkspace(key) {
+  return key === "e+1" || key === "e-1"
+}
+
 function normalizeWorkspaceMap(raw) {
   var out = {}
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out
@@ -241,6 +245,31 @@ function classMatchesDesktop(klass, initialClass, desktopId) {
 
 function isWindowAddress(addr) {
   return typeof addr === "string" && /^0x[0-9a-fA-F]{4,18}$/.test(addr)
+}
+
+function luaQuote(value) {
+  return String(value || "").replace(/\\/g, "").replace(/"/g, "")
+}
+
+function focusWorkspaceDispatch(ws, usingLua) {
+  if (!isWorkspaceKey(ws) && ws !== "e+1" && ws !== "e-1") return ""
+  if (usingLua) return 'hl.dsp.focus({ workspace = "' + luaQuote(ws) + '" })'
+  return "workspace " + ws
+}
+
+function focusWindowDispatch(addr, usingLua) {
+  if (!isWindowAddress(addr)) return ""
+  if (usingLua) return 'hl.dsp.focus({ window = "address:' + addr + '" })'
+  return "focuswindow address:" + addr
+}
+
+function classicToLua(classic) {
+  var s = String(classic || "")
+  if (s === "togglespecialworkspace omacorners")
+    return 'hl.dsp.workspace.toggle_special("omacorners")'
+  if (s === "workspace e+1") return focusWorkspaceDispatch("e+1", true)
+  if (s === "workspace e-1") return focusWorkspaceDispatch("e-1", true)
+  return s
 }
 
 function findClient(rawJson, desktopId, workspaceKey) {

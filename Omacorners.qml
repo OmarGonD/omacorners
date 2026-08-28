@@ -349,28 +349,39 @@ Item {
       focusOrLaunch(matchId, action)
       return
     }
+    root.runAction(action)
+  }
+
+  function runAction(action) {
     Actions.run(action, function(dispatch) {
-      Hyprland.dispatch(dispatch)
+      var req = Hyprland.usingLua ? Actions.classicToLua(dispatch) : dispatch
+      if (req) Hyprland.dispatch(req)
     }, function(argv) {
       Util.execArgv(argv)
     })
   }
 
+  function hyprDispatch(request) {
+    if (!request) return
+    Hyprland.dispatch(request)
+  }
+
   function revealWindow(addr, ws) {
     if (!Actions.isWindowAddress(addr)) return
-    if (ws && Actions.isWorkspaceKey(ws) && ws !== root.workspaceKey)
-      Hyprland.dispatch("workspace " + ws)
-    Hyprland.dispatch("focuswindow address:" + addr)
+    var lua = Hyprland.usingLua === true
+    var windowReq = Actions.focusWindowDispatch(addr, lua)
+    if (!windowReq) return
+    if (ws && Actions.isWorkspaceKey(ws) && ws !== root.workspaceKey) {
+      var wsReq = Actions.focusWorkspaceDispatch(ws, lua)
+      if (wsReq) hyprDispatch(wsReq)
+    }
+    hyprDispatch(windowReq)
   }
 
   function focusOrLaunch(matchId, action) {
     var desk = Actions.normalizeDesktopId(matchId)
     if (!desk) {
-      Actions.run(action, function(dispatch) {
-        Hyprland.dispatch(dispatch)
-      }, function(argv) {
-        Util.execArgv(argv)
-      })
+      root.runAction(action)
       return
     }
     if (clientsProc.running) clientsProc.running = false
@@ -546,12 +557,7 @@ Item {
         root.revealWindow(hit.address, hit.workspace)
         return
       }
-      var fallback = action || Actions.appAction(desk)
-      Actions.run(fallback, function(dispatch) {
-        Hyprland.dispatch(dispatch)
-      }, function(argv) {
-        Util.execArgv(argv)
-      })
+      root.runAction(action || Actions.appAction(desk))
     }
   }
 
@@ -577,7 +583,8 @@ Item {
         pendingPower: root.pendingPower,
         superArmed: root.superArmed,
         superSeen: root.superSeen,
-        dragging: root.dragging
+        dragging: root.dragging,
+        usingLua: Hyprland.usingLua === true
       })
     }
     function toggle(): string {
