@@ -42,6 +42,7 @@ Item {
     opened = true
     delayPreview = -1
     thresholdPreview = -1
+    if (ready && typeof svc.refreshActionOptions === "function") svc.refreshActionOptions()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -109,6 +110,10 @@ Item {
         focus: true
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
+          if (topLeftPick.popupOpen || topRightPick.popupOpen
+              || bottomLeftPick.popupOpen || bottomRightPick.popupOpen) {
+            return
+          }
           if (event.key === Qt.Key_Escape) {
             root.dismiss()
             event.accepted = true
@@ -138,7 +143,7 @@ Item {
 
           Text {
             width: parent.width
-            text: "Dwell in a screen corner to run its action. Corners set to None do nothing."
+            text: "Dwell in a corner to run its action, open an app, or power the machine. None does nothing."
             color: root.foreground
             opacity: 0.7
             wrapMode: Text.WordWrap
@@ -200,7 +205,7 @@ Item {
             Text {
               anchors.centerIn: parent
               text: root.ready && svc.liveCorner !== ""
-                ? Actions.labelOf(root.svc.actionForCorner(root.svc.liveCorner))
+                ? root.svc.labelForCorner(root.svc.liveCorner)
                 : "screen"
               color: root.foreground
               opacity: 0.45
@@ -216,44 +221,56 @@ Item {
           columnSpacing: Style.space(12)
           rowSpacing: Style.space(10)
 
-          Dropdown {
+          SearchableDropdown {
+            id: topLeftPick
             Layout.fillWidth: true
             label: "Top left"
             value: root.cornerValue("topLeft")
             options: root.actionOptions
+            placeholderText: "Search actions or apps…"
+            emptyText: "No matches"
             foreground: root.foreground
             background: root.background
             fontFamily: root.fontFamily
             onChanged: function(v) { root.setCorner("topLeft", v) }
           }
 
-          Dropdown {
+          SearchableDropdown {
+            id: topRightPick
             Layout.fillWidth: true
             label: "Top right"
             value: root.cornerValue("topRight")
             options: root.actionOptions
+            placeholderText: "Search actions or apps…"
+            emptyText: "No matches"
             foreground: root.foreground
             background: root.background
             fontFamily: root.fontFamily
             onChanged: function(v) { root.setCorner("topRight", v) }
           }
 
-          Dropdown {
+          SearchableDropdown {
+            id: bottomLeftPick
             Layout.fillWidth: true
             label: "Bottom left"
             value: root.cornerValue("bottomLeft")
             options: root.actionOptions
+            placeholderText: "Search actions or apps…"
+            emptyText: "No matches"
             foreground: root.foreground
             background: root.background
             fontFamily: root.fontFamily
             onChanged: function(v) { root.setCorner("bottomLeft", v) }
           }
 
-          Dropdown {
+          SearchableDropdown {
+            id: bottomRightPick
             Layout.fillWidth: true
             label: "Bottom right"
             value: root.cornerValue("bottomRight")
             options: root.actionOptions
+            placeholderText: "Search actions or apps…"
+            emptyText: "No matches"
             foreground: root.foreground
             background: root.background
             fontFamily: root.fontFamily

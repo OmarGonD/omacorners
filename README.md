@@ -13,7 +13,8 @@ clipboard, screenshot, and more.
 ## Features
 
 * **Per-corner actions.** Top-left, top-right, bottom-left, bottom-right, each
-  independently assigned from a fixed whitelist.
+  independently assigned from a fixed whitelist, including any installed
+  application, plus **Shut down** and **Restart**.
 * **Dwell delay.** Default 400ms, 0–2s. Corners set to None never fire, so you
   can keep a pass-through path between monitors.
 * **Corner glow.** An accent blob grows at the corner while you dwell, then
@@ -94,7 +95,15 @@ keybindings you added by hand are left in place.
 | Terminal | `omarchy-launch-terminal` |
 | Browser | `omarchy-launch-browser` |
 | Next / previous workspace | `workspace e+1` / `workspace e-1` |
+| Shut down | `omarchy-system-shutdown` (asks to confirm) |
+| Restart | `omarchy-system-reboot` (asks to confirm) |
+| An installed app | `uwsm-app -- gtk-launch <desktop-id>.desktop` |
 | Omacorners settings | this overlay |
+
+Search a corner's dropdown for an app name (for example "Chrome") to assign
+it. Application ids are stored as `app:<desktop-id>` after the id is checked
+against a strict desktop-file pattern. Shut down and Restart open a confirm
+dialog before they run.
 
 Unknown values in `shell.json` normalize to **None**. There is no free-form
 command field.

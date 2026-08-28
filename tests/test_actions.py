@@ -24,6 +24,8 @@ class ActionWhitelistTests(unittest.TestCase):
         self.assertEqual(ids[0], "none")
         self.assertIn("lock", ids)
         self.assertIn("desktop", ids)
+        self.assertIn("shutdown", ids)
+        self.assertIn("reboot", ids)
         self.assertIn("settings", ids)
 
     def test_argv_entries_are_literal_arrays_of_strings(self):
@@ -46,7 +48,18 @@ class ActionWhitelistTests(unittest.TestCase):
             self.assertRegex(item, r"^[a-z0-9]+ [a-z0-9+._-]+$")
 
     def test_normalize_unknown_is_none(self):
-        self.assertIn('return isAction(id) ? id : "none"', ACTIONS)
+        self.assertIn("if (isAppAction(id)) return id", ACTIONS)
+        self.assertIn('return "none"', ACTIONS)
+
+    def test_power_actions_use_omarchy_binaries(self):
+        self.assertIn('["omarchy-system-shutdown"]', ACTIONS)
+        self.assertIn('["omarchy-system-reboot"]', ACTIONS)
+        self.assertIn("needsConfirm", ACTIONS)
+
+    def test_app_launch_uses_gtk_launch_argv(self):
+        self.assertIn('["uwsm-app", "--", "gtk-launch", desktop + ".desktop"]', ACTIONS)
+        self.assertIn("isDesktopId", ACTIONS)
+        self.assertNotIn("bash -lc", ACTIONS)
 
     def test_no_shell_interpolation_helpers(self):
         lowered = ACTIONS.lower()

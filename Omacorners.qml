@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
+import qs.Ui
 import "Corners.js" as Corners
 import "Actions.js" as Actions
 
@@ -39,6 +40,7 @@ Item {
   readonly property bool welcomed: pluginEntry.welcomed === true
 
   property var actionOptions: []
+  property string pendingPower: ""
 
   property int cursorX: -100000
   property int cursorY: -100000
@@ -64,7 +66,51 @@ Item {
   }
 
   function labelForCorner(corner) {
-    return Actions.labelOf(actionForCorner(corner))
+    return prettyLabel(actionForCorner(corner))
+  }
+
+  function prettyLabel(id) {
+    var value = Actions.normalize(id)
+    var opts = actionOptions
+    if (opts && opts.length) {
+      for (var i = 0; i < opts.length; i++) {
+        if (opts[i] && opts[i].value === value) return String(opts[i].label)
+      }
+    }
+    return Actions.labelOf(value)
+  }
+
+  function refreshActionOptions() {
+    var out = Actions.options()
+    var seen = ({})
+    for (var i = 0; i < out.length; i++) seen[out[i].value] = true
+
+    var apps = []
+    try {
+      var values = DesktopEntries.applications.values || []
+      var n = values.length
+      if (typeof n !== "number") n = 0
+      if (n > 400) n = 400
+      for (var j = 0; j < n; j++) {
+        var entry = values[j]
+        if (!entry || entry.noDisplay === true) continue
+        var desk = Actions.normalizeDesktopId(entry.id)
+        if (!desk) continue
+        var value = Actions.appAction(desk)
+        if (seen[value]) continue
+        seen[value] = true
+        apps.push({ value: value, label: String(entry.name || desk) })
+      }
+    } catch (e) {}
+
+    apps.sort(function(a, b) {
+      var al = String(a.label).toLowerCase()
+      var bl = String(b.label).toLowerCase()
+      if (al < bl) return -1
+      if (al > bl) return 1
+      return 0
+    })
+    actionOptions = out.concat(apps)
   }
 
   function persist(changes) {
@@ -130,6 +176,7 @@ Item {
   function onCursor(x, y) {
     cursorX = x
     cursorY = y
+    if (pendingPower !== "") return
     if (!active) {
       clearDwell()
       return
@@ -162,19 +209,43 @@ Item {
     dwellProgress = Math.max(0, Math.min(1, (Date.now() - dwellStartedAt) / delayMs))
   }
 
+  function executeAction(action) {
+    Actions.run(action, function(dispatch) {
+      Hyprland.dispatch(dispatch)
+    }, function(argv) {
+      Util.execArgv(argv)
+    })
+  }
+
   function fire() {
-    if (!active || latched || dwellCorner === "") return
+    if (!active || latched || dwellCorner === "" || pendingPower !== "") return
     var action = actionForCorner(dwellCorner)
     if (action === "none") return
     latched = true
     dwellProgress = 1
     pulsing = true
     pulseTimer.restart()
-    Actions.run(action, function(dispatch) {
-      Hyprland.dispatch(dispatch)
-    }, function(argv) {
-      Util.execArgv(argv)
-    })
+    if (Actions.needsConfirm(action)) {
+      if (shell && typeof shell.hide === "function") shell.hide(pluginId)
+      pendingPower = action
+      return
+    }
+    executeAction(action)
+  }
+
+  function confirmPower() {
+    var action = pendingPower
+    pendingPower = ""
+    if (Actions.needsConfirm(action)) executeAction(action)
+  }
+
+  function cancelPower() {
+    pendingPower = ""
+  }
+
+  onPendingPowerChanged: {
+    if (pendingPower !== "")
+      Qt.callLater(function() { confirmKeyCatcher.forceActiveFocus() })
   }
 
   function startHelper() {
@@ -190,7 +261,7 @@ Item {
   }
 
   Component.onCompleted: {
-    actionOptions = Actions.options()
+    refreshActionOptions()
     if (active) startHelper()
     if (!welcomed) welcomeTimer.start()
   }
@@ -300,7 +371,8 @@ Item {
         cursorX: root.cursorX,
         cursorY: root.cursorY,
         dwellCorner: root.dwellCorner,
-        helper: helperProc.running
+        helper: helperProc.running,
+        pendingPower: root.pendingPower
       })
     }
     function toggle(): string {
@@ -361,6 +433,43 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
         Behavior on width { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
         Behavior on height { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+      }
+    }
+  }
+
+  PanelWindow {
+    id: confirmWindow
+    visible: root.pendingPower !== ""
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    WlrLayershell.namespace: "omacorners-confirm"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.pendingPower !== "" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    exclusionMode: ExclusionMode.Ignore
+
+    ConfirmDialog {
+      id: powerConfirm
+      anchors.fill: parent
+      opened: root.pendingPower !== ""
+      message: Actions.confirmMessage(root.pendingPower)
+      confirmText: Actions.confirmLabel(root.pendingPower)
+      cancelText: "Cancel"
+      background: Color.menu.background
+      foreground: Color.menu.text
+      scrim: Color.menu.scrim
+      fontFamily: Style.font.menuFamily
+      cornerRadius: Style.cornerRadius
+      onConfirmed: root.confirmPower()
+      onCanceled: root.cancelPower()
+    }
+
+    Item {
+      id: confirmKeyCatcher
+      anchors.fill: parent
+      focus: root.pendingPower !== ""
+      Keys.priority: Keys.BeforeItem
+      Keys.onPressed: function(event) {
+        if (powerConfirm.handleKey(event)) event.accepted = true
       }
     }
   }

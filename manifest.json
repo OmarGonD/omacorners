@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.omargond.omacorners",
   "name": "Omacorners",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "OmarGonD",
   "license": "MIT",
   "description": "macOS-style hot corners for Omarchy: dwell in a screen corner to lock, show the desktop, open the menu, and more.",
