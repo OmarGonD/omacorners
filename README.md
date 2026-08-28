@@ -65,6 +65,15 @@ omarchy plugin disable io.github.omargond.omacorners
 The settings overlay also has an **Enabled** switch that pauses corner
 detection without dropping your assignments.
 
+## Remove
+
+```bash
+omarchy plugin remove io.github.omargond.omacorners
+```
+
+Deletes the plugin checkout and its `shell.json` entry. Menu rows or
+keybindings you added by hand are left in place.
+
 ## Actions
 
 | Action | What it runs |
