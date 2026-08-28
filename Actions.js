@@ -123,6 +123,143 @@ function options() {
   return out
 }
 
+var CORNERS = ["topLeft", "topRight", "bottomLeft", "bottomRight"]
+var WORKSPACE_KEY = /^[1-9][0-9]{0,2}$/
+var WORKSPACE_MAP_MAX = 32
+
+function clampPowerDelayMs(value) {
+  var n = Number(value)
+  if (!isFinite(n)) return 800
+  if (n < 0) return 0
+  if (n > 2000) return 2000
+  return Math.round(n)
+}
+
+function workspaceKeyFrom(ws) {
+  if (!ws) return ""
+  var id = Number(ws.id)
+  if (!isFinite(id) || id < 1 || id > 999) return ""
+  return String(Math.round(id))
+}
+
+function isWorkspaceKey(key) {
+  return typeof key === "string" && WORKSPACE_KEY.test(key)
+}
+
+function normalizeWorkspaceMap(raw) {
+  var out = {}
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out
+  var keys = []
+  for (var key in raw) {
+    if (!raw.hasOwnProperty(key)) continue
+    keys.push(key)
+  }
+  if (keys.length > WORKSPACE_MAP_MAX) keys = keys.slice(0, WORKSPACE_MAP_MAX)
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i]
+    if (!isWorkspaceKey(k)) continue
+    var rec = raw[k]
+    if (!rec || typeof rec !== "object") continue
+    var cleaned = {}
+    var any = false
+    for (var c = 0; c < CORNERS.length; c++) {
+      var which = CORNERS[c]
+      if (rec[which] === undefined || rec[which] === null || rec[which] === "") continue
+      cleaned[which] = normalize(rec[which])
+      any = true
+    }
+    if (any) out[k] = cleaned
+  }
+  return out
+}
+
+function resolved(defaults, map, wsKey, which) {
+  var over = map && isWorkspaceKey(wsKey) ? map[wsKey] : null
+  if (over && over[which] !== undefined) return normalize(over[which])
+  return normalize(defaults ? defaults[which] : "none")
+}
+
+function hasOverride(map, wsKey) {
+  return !!(map && isWorkspaceKey(wsKey) && map[wsKey])
+}
+
+function isOverridden(map, wsKey, which) {
+  var over = map && isWorkspaceKey(wsKey) ? map[wsKey] : null
+  return !!(over && over[which] !== undefined)
+}
+
+function withOverride(map, wsKey, which, action) {
+  var next = normalizeWorkspaceMap(map)
+  if (!isWorkspaceKey(wsKey)) return next
+  var rec = next[wsKey] ? next[wsKey] : {}
+  var copy = {}
+  for (var i = 0; i < CORNERS.length; i++) {
+    var c = CORNERS[i]
+    if (rec[c] !== undefined) copy[c] = rec[c]
+  }
+  copy[which] = normalize(action)
+  next[wsKey] = copy
+  return next
+}
+
+function withoutWorkspace(map, wsKey) {
+  var next = normalizeWorkspaceMap(map)
+  if (next[wsKey]) delete next[wsKey]
+  return next
+}
+
+function entryIsThin(entry) {
+  if (!entry || typeof entry !== "object") return true
+  for (var k in entry) {
+    if (!entry.hasOwnProperty(k)) continue
+    if (k === "id") continue
+    return false
+  }
+  return true
+}
+
+function classMatchesDesktop(klass, initialClass, desktopId) {
+  var id = String(desktopId || "").toLowerCase()
+  if (!id) return false
+  var klassL = String(klass || "").toLowerCase()
+  var initial = String(initialClass || "").toLowerCase()
+  var lastDot = id.lastIndexOf(".")
+  var last = lastDot >= 0 ? id.substring(lastDot + 1) : id
+  if (klassL === id || initial === id) return true
+  if (klassL === last || initial === last) return true
+  if (klassL.replace(/_/g, "-") === id || initial.replace(/_/g, "-") === id) return true
+  return false
+}
+
+function isWindowAddress(addr) {
+  return typeof addr === "string" && /^0x[0-9a-fA-F]{4,18}$/.test(addr)
+}
+
+function findClientAddress(rawJson, desktopId, workspaceKey) {
+  var desk = normalizeDesktopId(desktopId)
+  if (!desk) return ""
+  var list
+  try { list = JSON.parse(String(rawJson || "")) } catch (e) { return "" }
+  if (!Array.isArray(list)) return ""
+  var n = list.length
+  if (typeof n !== "number" || n < 0) return ""
+  if (n > 256) n = 256
+  var fallback = ""
+  var wantWs = workspaceKey ? String(workspaceKey) : ""
+  for (var i = 0; i < n; i++) {
+    var client = list[i]
+    if (!client || typeof client !== "object") continue
+    if (client.mapped === false) continue
+    if (!classMatchesDesktop(client["class"], client.initialClass, desk)) continue
+    var addr = String(client.address || "")
+    if (!isWindowAddress(addr)) continue
+    var ws = client.workspace && client.workspace.id != null ? String(client.workspace.id) : ""
+    if (wantWs && ws === wantWs) return addr
+    if (!fallback) fallback = addr
+  }
+  return fallback
+}
+
 function run(id, hyprDispatch, execArgv) {
   id = normalize(id)
   if (id === "none") return false

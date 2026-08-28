@@ -15,14 +15,20 @@ clipboard, screenshot, and more.
 * **Per-corner actions.** Top-left, top-right, bottom-left, bottom-right, each
   independently assigned from a fixed whitelist, including any installed
   application, plus **Shut down** and **Restart**.
-* **Dwell delay.** Default 400ms, 0–2s. Corners set to None never fire, so you
-  can keep a pass-through path between monitors.
-* **Corner glow.** An accent blob grows at the corner while you dwell, then
-  pulses when the action runs. Click-through overlay — it never steals input.
-* **Show desktop.** Toggles an empty Hyprland special workspace named
-  `omacorners`, so windows stay where they were.
-* **Settings overlay.** Visual screen diagram, four dropdowns, delay and
-  corner-size sliders, and a pause toggle that keeps your assignments.
+* **Per-workspace overrides.** Defaults apply everywhere. A workspace can
+  override only the corners that should differ; the rest inherit.
+* **Hold Super to arm** (on by default). Corners fire only while Super is
+  held, so dragging a window to an edge does not trip them.
+* **Open or focus.** An app corner focuses an existing window if one exists,
+  and launches only when none is mapped.
+* **Suppression.** Fullscreen, pointer-button drag, and the Omarchy menu /
+  emoji / clipboard overlays do not fire corners.
+* **Power dwell.** Shut down and restart add extra dwell time, then still
+  ask to confirm.
+* **Bar dots.** A 2×2 of dots shows the current workspace map; click opens
+  settings.
+* **Dwell delay.** Default 400ms, 0–2s. Corners set to None never fire.
+* **Corner glow.** An accent blob grows while you dwell. Click-through overlay.
 
 ## Install
 
@@ -116,8 +122,14 @@ Stored on the plugin's entry in `~/.config/omarchy/shell.json`:
 |---|---|---|
 | `active` | `true` | Master switch |
 | `delayMs` | `400` | Dwell time, 0–2000 |
+| `powerDelayMs` | `800` | Extra dwell for shut down / restart, 0–2000 |
 | `thresholdPx` | `8` | Corner hit size in layout pixels, 2–48 |
-| `topLeft` / `topRight` / `bottomLeft` / `bottomRight` | `none` | Action ids from the table above |
+| `requireSuper` | `true` | Hold Super to arm corners |
+| `suppressFullscreen` | `true` | Ignore fullscreen windows |
+| `suppressDrag` | `true` | Ignore while a pointer button is held |
+| `suppressOverlay` | `true` | Ignore menu / emoji / clipboard overlays |
+| `topLeft` / `topRight` / `bottomLeft` / `bottomRight` | `none` | Default actions |
+| `workspaces` | `{}` | `{ "2": { "topLeft": "app:google-chrome" } }` overrides |
 
 IPC for debugging: `omarchy-shell omacorners status`
 

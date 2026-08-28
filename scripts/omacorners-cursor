@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """Poll Hyprland cursor position over the compositor request socket.
 
-Prints `POS <x> <y>` to stdout whenever the pointer moves, plus a heartbeat
-`POS` while it is still, so the QML service can tell a live helper from a
-stuck one. No files are written. No other sockets are opened.
+Prints `POS <x> <y>` on movement, plus `ARM 0|1` and `DRAG 0|1` when Super or
+a pointer button changes. Super/button state is read from `/dev/input/event*`
+without grabbing devices. No files are written. No network.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import select
 import socket
+import struct
 import sys
 import time
 from typing import Any
+
+EV_KEY = 1
+KEY_LEFTMETA = 125
+KEY_RIGHTMETA = 126
+BTN_CODES = {272, 273, 274, 275, 276}
+META_CODES = {KEY_LEFTMETA, KEY_RIGHTMETA}
+EVENT_FORMAT = "llHHi"
+EVENT_SIZE = struct.calcsize(EVENT_FORMAT)
 
 NEAR_EDGE_PX = 64
 IDLE_INTERVAL_S = 0.080
@@ -156,6 +166,79 @@ def emit_pos(x: int, y: int) -> None:
     sys.stdout.flush()
 
 
+def emit_flag(name: str, on: bool) -> None:
+    sys.stdout.write(f"{name} {1 if on else 0}\n")
+    sys.stdout.flush()
+
+
+def parse_evdev_events(payload: bytes) -> list[tuple[int, int, int]]:
+    out: list[tuple[int, int, int]] = []
+    i = 0
+    n = len(payload)
+    while i + EVENT_SIZE <= n:
+        _sec, _usec, ev_type, code, value = struct.unpack_from(EVENT_FORMAT, payload, i)
+        i += EVENT_SIZE
+        out.append((int(ev_type), int(code), int(value)))
+    return out
+
+
+def open_input_fds(directory: str = "/dev/input") -> list[int]:
+    fds: list[int] = []
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return fds
+    for name in names:
+        if not name.startswith("event"):
+            continue
+        path = os.path.join(directory, name)
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        except OSError:
+            continue
+        if len(fds) >= 32:
+            os.close(fd)
+            break
+        fds.append(fd)
+    return fds
+
+
+def apply_evdev(ev_type: int, code: int, value: int, meta: set[int], buttons: set[int]) -> None:
+    if ev_type != EV_KEY:
+        return
+    down = value != 0
+    if code in META_CODES:
+        if down:
+            meta.add(code)
+        else:
+            meta.discard(code)
+    elif code in BTN_CODES:
+        if down:
+            buttons.add(code)
+        else:
+            buttons.discard(code)
+
+
+def drain_input(fds: list[int], meta: set[int], buttons: set[int]) -> None:
+    if not fds:
+        return
+    try:
+        ready, _, _ = select.select(fds, [], [], 0)
+    except (OSError, ValueError):
+        return
+    for fd in ready:
+        try:
+            payload = os.read(fd, EVENT_SIZE * 64)
+        except BlockingIOError:
+            continue
+        except OSError:
+            continue
+        if not payload:
+            continue
+        for ev_type, code, value in parse_evdev_events(payload):
+            apply_evdev(ev_type, code, value, meta, buttons)
+
+
 def main() -> int:
     path = find_socket()
     if not path:
@@ -166,27 +249,54 @@ def main() -> int:
     last_emit = 0.0
     last_monitors_at = 0.0
     monitors: list[dict[str, Any]] = []
+    input_fds = open_input_fds()
+    meta_held: set[int] = set()
+    buttons_held: set[int] = set()
+    last_arm: bool | None = None
+    last_drag: bool | None = None
+    if input_fds:
+        emit_flag("ARM", False)
+        emit_flag("DRAG", False)
+        last_arm = False
+        last_drag = False
 
-    while True:
-        now = time.monotonic()
-        if now - last_monitors_at >= MONITOR_REFRESH_S or not monitors:
-            raw_mon = hypr_request(path, "j/monitors")
-            parsed = parse_monitors(raw_mon.decode("utf-8", "replace"))
-            if parsed:
-                monitors = parsed
-            last_monitors_at = now
+    try:
+        while True:
+            drain_input(input_fds, meta_held, buttons_held)
+            armed = len(meta_held) > 0
+            dragging = len(buttons_held) > 0
+            if last_arm is not None and armed != last_arm:
+                emit_flag("ARM", armed)
+                last_arm = armed
+            if last_drag is not None and dragging != last_drag:
+                emit_flag("DRAG", dragging)
+                last_drag = dragging
 
-        raw_pos = hypr_request(path, "cursorpos")
-        pos = parse_cursorpos(raw_pos.decode("utf-8", "replace"))
-        if pos is not None:
-            if pos != last_pos or now - last_emit >= HEARTBEAT_S:
-                emit_pos(pos[0], pos[1])
-                last_pos = pos
-                last_emit = now
-            interval = NEAR_INTERVAL_S if near_edge(pos[0], pos[1], monitors) else IDLE_INTERVAL_S
-        else:
-            interval = IDLE_INTERVAL_S
-        time.sleep(interval)
+            now = time.monotonic()
+            if now - last_monitors_at >= MONITOR_REFRESH_S or not monitors:
+                raw_mon = hypr_request(path, "j/monitors")
+                parsed = parse_monitors(raw_mon.decode("utf-8", "replace"))
+                if parsed:
+                    monitors = parsed
+                last_monitors_at = now
+
+            raw_pos = hypr_request(path, "cursorpos")
+            pos = parse_cursorpos(raw_pos.decode("utf-8", "replace"))
+            if pos is not None:
+                if pos != last_pos or now - last_emit >= HEARTBEAT_S:
+                    emit_pos(pos[0], pos[1])
+                    last_pos = pos
+                    last_emit = now
+                interval = NEAR_INTERVAL_S if near_edge(pos[0], pos[1], monitors) else IDLE_INTERVAL_S
+            else:
+                interval = IDLE_INTERVAL_S
+            time.sleep(interval)
+    finally:
+        for fd in input_fds:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

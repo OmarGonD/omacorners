@@ -106,6 +106,22 @@ class CursorHelperTests(unittest.TestCase):
         mode = HELPER.stat().st_mode
         self.assertTrue(stat.S_ISREG(mode))
 
+    def test_parse_evdev_and_apply_super_and_buttons(self):
+        import struct
+        fmt = "llHHi"
+        payload = struct.pack(fmt, 0, 0, 1, 125, 1) + struct.pack(fmt, 0, 0, 1, 272, 1)
+        events = self.mod.parse_evdev_events(payload)
+        self.assertEqual(events, [(1, 125, 1), (1, 272, 1)])
+        meta, buttons = set(), set()
+        for ev in events:
+            self.mod.apply_evdev(*ev, meta, buttons)
+        self.assertEqual(meta, {125})
+        self.assertEqual(buttons, {272})
+        self.mod.apply_evdev(1, 125, 0, meta, buttons)
+        self.mod.apply_evdev(1, 272, 0, meta, buttons)
+        self.assertEqual(meta, set())
+        self.assertEqual(buttons, set())
+
 
 if __name__ == "__main__":
     unittest.main()

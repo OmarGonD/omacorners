@@ -23,24 +23,50 @@ Item {
 
   readonly property var pluginEntry: {
     var cfg = shell ? shell.shellConfig : null
+    var pluginRec = ({})
     var list = cfg && Array.isArray(cfg.plugins) ? cfg.plugins : []
     for (var i = 0; i < list.length; i++) {
-      if (list[i] && String(list[i].id || "") === pluginId) return list[i]
+      if (list[i] && String(list[i].id || "") === pluginId) { pluginRec = list[i]; break }
     }
-    return ({})
+    var barRec = ({})
+    var layout = cfg && cfg.bar && cfg.bar.layout ? cfg.bar.layout : null
+    var sections = ["left", "center", "right"]
+    if (layout) {
+      for (var s = 0; s < sections.length; s++) {
+        var arr = layout[sections[s]] || []
+        for (var j = 0; j < arr.length; j++) {
+          if (arr[j] && String(arr[j].id || "") === pluginId) { barRec = arr[j]; s = 99; break }
+        }
+      }
+    }
+    if (!Actions.entryIsThin(barRec)) return barRec
+    if (!Actions.entryIsThin(pluginRec)) return pluginRec
+    if (barRec && barRec.id) return barRec
+    return pluginRec
   }
 
   readonly property bool active: pluginEntry.active === false ? false : true
   readonly property int delayMs: Corners.clampDelayMs(pluginEntry.delayMs === undefined ? 400 : pluginEntry.delayMs)
   readonly property int thresholdPx: Corners.clampThresholdPx(pluginEntry.thresholdPx === undefined ? 8 : pluginEntry.thresholdPx)
+  readonly property int powerDelayMs: Actions.clampPowerDelayMs(pluginEntry.powerDelayMs === undefined ? 800 : pluginEntry.powerDelayMs)
+  readonly property bool requireSuper: pluginEntry.requireSuper === false ? false : true
+  readonly property bool suppressFullscreen: pluginEntry.suppressFullscreen === false ? false : true
+  readonly property bool suppressDrag: pluginEntry.suppressDrag === false ? false : true
+  readonly property bool suppressOverlay: pluginEntry.suppressOverlay === false ? false : true
   readonly property string topLeft: Actions.normalize(pluginEntry.topLeft)
   readonly property string topRight: Actions.normalize(pluginEntry.topRight)
   readonly property string bottomLeft: Actions.normalize(pluginEntry.bottomLeft)
   readonly property string bottomRight: Actions.normalize(pluginEntry.bottomRight)
+  readonly property var workspaceMap: Actions.normalizeWorkspaceMap(pluginEntry.workspaces)
   readonly property bool welcomed: pluginEntry.welcomed === true
+  readonly property string workspaceKey: Actions.workspaceKeyFrom(Hyprland.focusedWorkspace)
 
   property var actionOptions: []
   property string pendingPower: ""
+  property bool superArmed: true
+  property bool superSeen: false
+  property bool dragging: false
+  property string focusDesktopId: ""
 
   property int cursorX: -100000
   property int cursorY: -100000
@@ -57,12 +83,50 @@ Item {
   readonly property string liveScreen: dwellScreen
   readonly property real liveProgress: dwellProgress
 
+  function whichFromCorner(corner) {
+    if (corner === "tl") return "topLeft"
+    if (corner === "tr") return "topRight"
+    if (corner === "bl") return "bottomLeft"
+    if (corner === "br") return "bottomRight"
+    return ""
+  }
+
+  function defaults() {
+    return { topLeft: topLeft, topRight: topRight, bottomLeft: bottomLeft, bottomRight: bottomRight }
+  }
+
+  function resolvedCorner(which) {
+    return Actions.resolved(defaults(), workspaceMap, workspaceKey, which)
+  }
+
   function actionForCorner(corner) {
-    if (corner === "tl") return topLeft
-    if (corner === "tr") return topRight
-    if (corner === "bl") return bottomLeft
-    if (corner === "br") return bottomRight
-    return "none"
+    var which = whichFromCorner(corner)
+    if (!which) return "none"
+    return resolvedCorner(which)
+  }
+
+  readonly property bool fullscreenActive: {
+    var top = Hyprland.activeToplevel
+    var obj = top ? top.lastIpcObject : null
+    if (!obj) return false
+    var fs = obj.fullscreen
+    return fs === 1 || fs === 2 || fs === true
+  }
+
+  function overlayBlocking() {
+    if (pendingPower !== "") return true
+    if (!shell || typeof shell.isPluginOpen !== "function") return false
+    var ids = ["omarchy.menu", "omarchy.emojis", "omarchy.clipboard", "omarchy.image-picker"]
+    for (var i = 0; i < ids.length; i++) {
+      try { if (shell.isPluginOpen(ids[i])) return true } catch (e) {}
+    }
+    return false
+  }
+
+  function waitFor(action) {
+    var base = delayMs
+    if (Actions.needsConfirm(action)) return base + powerDelayMs
+    return base
   }
 
   function labelForCorner(corner) {
@@ -119,10 +183,16 @@ Item {
       active: active,
       delayMs: delayMs,
       thresholdPx: thresholdPx,
+      powerDelayMs: powerDelayMs,
+      requireSuper: requireSuper,
+      suppressFullscreen: suppressFullscreen,
+      suppressDrag: suppressDrag,
+      suppressOverlay: suppressOverlay,
       topLeft: topLeft,
       topRight: topRight,
       bottomLeft: bottomLeft,
       bottomRight: bottomRight,
+      workspaces: workspaceMap,
       welcomed: welcomed
     }
     if (changes) {
@@ -134,17 +204,65 @@ Item {
     if (entry.bottomRight !== undefined) entry.bottomRight = Actions.normalize(entry.bottomRight)
     if (entry.delayMs !== undefined) entry.delayMs = Corners.clampDelayMs(entry.delayMs)
     if (entry.thresholdPx !== undefined) entry.thresholdPx = Corners.clampThresholdPx(entry.thresholdPx)
+    if (entry.powerDelayMs !== undefined) entry.powerDelayMs = Actions.clampPowerDelayMs(entry.powerDelayMs)
+    if (entry.workspaces !== undefined) entry.workspaces = Actions.normalizeWorkspaceMap(entry.workspaces)
+    if (shell && typeof shell.mutateShellConfig === "function") {
+      var payload = JSON.parse(JSON.stringify(entry))
+      shell.mutateShellConfig(function(config) {
+        root.writeEntryInto(config, payload)
+      })
+      return
+    }
     if (shell && typeof shell.updateEntryInline === "function")
       shell.updateEntryInline(pluginId, entry)
   }
 
-  function setCorner(which, id) {
+  function writeEntryInto(config, entry) {
+    var written = false
+    if (!config.plugins) config.plugins = []
+    for (var j = 0; j < config.plugins.length; j++) {
+      if (config.plugins[j] && String(config.plugins[j].id || "") === pluginId) {
+        config.plugins[j] = entry
+        written = true
+      }
+    }
+    var layout = config.bar && config.bar.layout ? config.bar.layout : null
+    var sections = ["left", "center", "right"]
+    if (layout) {
+      for (var s = 0; s < sections.length; s++) {
+        var arr = layout[sections[s]] || []
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] && String(arr[i].id || "") === pluginId) {
+            layout[sections[s]][i] = entry
+            written = true
+          }
+        }
+      }
+    }
+    if (!written) config.plugins.push(entry)
+  }
+
+  function setCorner(which, id, workspaceScope) {
     if (which !== "topLeft" && which !== "topRight" && which !== "bottomLeft" && which !== "bottomRight")
       return
+    if (workspaceScope && Actions.isWorkspaceKey(workspaceScope)) {
+      persist({ workspaces: Actions.withOverride(workspaceMap, workspaceScope, which, id) })
+      return
+    }
     var changes = {}
     changes[which] = Actions.normalize(id)
     persist(changes)
   }
+
+  function clearWorkspace(workspaceScope) {
+    persist({ workspaces: Actions.withoutWorkspace(workspaceMap, workspaceScope) })
+  }
+
+  function setRequireSuper(value) { persist({ requireSuper: value !== false }) }
+  function setSuppressFullscreen(value) { persist({ suppressFullscreen: value !== false }) }
+  function setSuppressDrag(value) { persist({ suppressDrag: value !== false }) }
+  function setSuppressOverlay(value) { persist({ suppressOverlay: value !== false }) }
+  function setPowerDelayMs(value) { persist({ powerDelayMs: Actions.clampPowerDelayMs(value) }) }
 
   function setDelayMs(value) {
     persist({ delayMs: Corners.clampDelayMs(value) })
@@ -173,11 +291,21 @@ Item {
     dwellProgress = 0
   }
 
+  function blocked() {
+    if (!active) return true
+    if (pendingPower !== "") return true
+    if (requireSuper && superSeen && !superArmed) return true
+    if (suppressDrag && dragging) return true
+    if (suppressFullscreen && fullscreenActive) return true
+    if (suppressOverlay && overlayBlocking()) return true
+    return false
+  }
+
   function onCursor(x, y) {
     cursorX = x
     cursorY = y
     if (pendingPower !== "") return
-    if (!active) {
+    if (blocked()) {
       clearDwell()
       return
     }
@@ -196,25 +324,42 @@ Item {
     dwellCorner = hit.corner
     dwellScreen = hit.name
     dwellStartedAt = Date.now()
-    dwellProgress = delayMs <= 0 ? 1 : 0
-    if (delayMs <= 0) fire()
+    var wait = waitFor(actionForCorner(hit.corner))
+    dwellTimer.interval = Math.max(1, wait)
+    dwellProgress = wait <= 0 ? 1 : 0
+    if (wait <= 0) fire()
     else dwellTimer.restart()
   }
 
   function updateProgress() {
-    if (delayMs <= 0) {
+    var wait = waitFor(actionForCorner(dwellCorner))
+    if (wait <= 0) {
       dwellProgress = 1
       return
     }
-    dwellProgress = Math.max(0, Math.min(1, (Date.now() - dwellStartedAt) / delayMs))
+    dwellProgress = Math.max(0, Math.min(1, (Date.now() - dwellStartedAt) / wait))
   }
 
   function executeAction(action) {
+    if (Actions.isAppAction(action)) {
+      focusOrLaunch(Actions.desktopIdOf(action))
+      return
+    }
     Actions.run(action, function(dispatch) {
       Hyprland.dispatch(dispatch)
     }, function(argv) {
       Util.execArgv(argv)
     })
+  }
+
+  function focusOrLaunch(desktopId) {
+    var desk = Actions.normalizeDesktopId(desktopId)
+    if (!desk) return
+    if (clientsProc.running) {
+      clientsProc.running = false
+    }
+    focusDesktopId = desk
+    clientsProc.running = true
   }
 
   function fire() {
@@ -296,7 +441,7 @@ Item {
     id: progressTimer
     interval: 16
     repeat: true
-    running: root.dwellCorner !== "" && !root.latched && root.delayMs > 0
+    running: root.dwellCorner !== "" && !root.latched && root.waitFor(root.actionForCorner(root.dwellCorner)) > 0
     onTriggered: root.updateProgress()
   }
 
@@ -325,6 +470,15 @@ Item {
       splitMarker: "\n"
       onRead: function(data) {
         var line = String(data || "").trim()
+        if (line === "ARM 1" || line === "ARM 0") {
+          root.superSeen = true
+          root.superArmed = line === "ARM 1"
+          return
+        }
+        if (line === "DRAG 1" || line === "DRAG 0") {
+          root.dragging = line === "DRAG 1"
+          return
+        }
         if (line.indexOf("POS ") !== 0) return
         var parts = line.split(" ")
         if (parts.length !== 3) return
@@ -356,6 +510,31 @@ Item {
     }
   }
 
+  Process {
+    id: clientsProc
+    running: false
+    command: ["hyprctl", "-j", "clients"]
+    stdout: StdioCollector {
+      id: clientsOut
+      waitForEnd: true
+    }
+    onExited: function(code) {
+      var desk = root.focusDesktopId
+      root.focusDesktopId = ""
+      if (!desk) return
+      var addr = code === 0 ? Actions.findClientAddress(clientsOut.text, desk, root.workspaceKey) : ""
+      if (addr) {
+        Hyprland.dispatch("focuswindow address:" + addr)
+        return
+      }
+      Actions.run(Actions.appAction(desk), function(dispatch) {
+        Hyprland.dispatch(dispatch)
+      }, function(argv) {
+        Util.execArgv(argv)
+      })
+    }
+  }
+
   IpcHandler {
     target: "omacorners"
     function ping(): string { return "ok" }
@@ -364,15 +543,21 @@ Item {
         active: root.active,
         delayMs: root.delayMs,
         thresholdPx: root.thresholdPx,
-        topLeft: root.topLeft,
-        topRight: root.topRight,
-        bottomLeft: root.bottomLeft,
-        bottomRight: root.bottomRight,
+        powerDelayMs: root.powerDelayMs,
+        requireSuper: root.requireSuper,
+        workspaceKey: root.workspaceKey,
+        topLeft: root.resolvedCorner("topLeft"),
+        topRight: root.resolvedCorner("topRight"),
+        bottomLeft: root.resolvedCorner("bottomLeft"),
+        bottomRight: root.resolvedCorner("bottomRight"),
         cursorX: root.cursorX,
         cursorY: root.cursorY,
         dwellCorner: root.dwellCorner,
         helper: helperProc.running,
-        pendingPower: root.pendingPower
+        pendingPower: root.pendingPower,
+        superArmed: root.superArmed,
+        superSeen: root.superSeen,
+        dragging: root.dragging
       })
     }
     function toggle(): string {
