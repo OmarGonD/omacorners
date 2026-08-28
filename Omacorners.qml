@@ -552,7 +552,8 @@ Item {
       root.focusDesktopId = ""
       root.focusAction = ""
       if (!desk) return
-      var hit = code === 0 ? Actions.findClient(clientsOut.text, desk, root.workspaceKey) : null
+      var activeAddr = Hyprland.activeToplevel ? String(Hyprland.activeToplevel.address || "") : ""
+      var hit = code === 0 ? Actions.findClient(clientsOut.text, desk, root.workspaceKey, activeAddr) : null
       if (hit && hit.address) {
         root.revealWindow(hit.address, hit.workspace)
         return

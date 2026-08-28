@@ -272,7 +272,23 @@ function classicToLua(classic) {
   return s
 }
 
-function findClient(rawJson, desktopId, workspaceKey) {
+function historyRank(client) {
+  var n = Number(client && client.focusHistoryID)
+  if (!isFinite(n) || n < 0) return 9999
+  return n
+}
+
+function pickClient(local, other, activeAddress) {
+  var active = String(activeAddress || "")
+  var i
+  for (i = 0; i < local.length; i++) {
+    if (local[i].address !== active) return local[i]
+  }
+  if (other.length) return other[0]
+  return local.length ? local[0] : null
+}
+
+function findClient(rawJson, desktopId, workspaceKey, activeAddress) {
   var desk = normalizeDesktopId(desktopId)
   if (!desk) return null
   var list
@@ -281,7 +297,8 @@ function findClient(rawJson, desktopId, workspaceKey) {
   var n = list.length
   if (typeof n !== "number" || n < 0) return null
   if (n > 256) n = 256
-  var fallback = null
+  var local = []
+  var other = []
   var wantWs = workspaceKey ? String(workspaceKey) : ""
   for (var i = 0; i < n; i++) {
     var client = list[i]
@@ -291,15 +308,17 @@ function findClient(rawJson, desktopId, workspaceKey) {
     var addr = String(client.address || "")
     if (!isWindowAddress(addr)) continue
     var ws = client.workspace && client.workspace.id != null ? String(client.workspace.id) : ""
-    var hit = { address: addr, workspace: isWorkspaceKey(ws) ? ws : "" }
-    if (wantWs && ws === wantWs) return hit
-    if (!fallback) fallback = hit
+    var hit = { address: addr, workspace: isWorkspaceKey(ws) ? ws : "", history: historyRank(client) }
+    if (wantWs && ws === wantWs) local.push(hit)
+    else other.push(hit)
   }
-  return fallback
+  local.sort(function(a, b) { return a.history - b.history })
+  other.sort(function(a, b) { return a.history - b.history })
+  return pickClient(local, other, activeAddress)
 }
 
-function findClientAddress(rawJson, desktopId, workspaceKey) {
-  var hit = findClient(rawJson, desktopId, workspaceKey)
+function findClientAddress(rawJson, desktopId, workspaceKey, activeAddress) {
+  var hit = findClient(rawJson, desktopId, workspaceKey, activeAddress)
   return hit ? hit.address : ""
 }
 

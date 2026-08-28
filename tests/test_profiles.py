@@ -60,29 +60,23 @@ class WorkspaceOverrideTests(unittest.TestCase):
 
 class ClientMatchTests(unittest.TestCase):
     def test_find_prefers_current_workspace(self):
-        import json
-        # Import the JS logic via a tiny python replica of findClientAddress
-        raw = json.dumps([
-            {"class": "google-chrome", "initialClass": "google-chrome", "address": "0xaaaa", "mapped": True, "workspace": {"id": 1}},
-            {"class": "google-chrome", "initialClass": "google-chrome", "address": "0xbbbb", "mapped": True, "workspace": {"id": 2}},
-        ])
-        # Replicate from Actions.js using a subprocess-less parse
-        from pathlib import Path
-        # execute the matching rules inline
-        def find(raw_json, desk, ws):
-            data = json.loads(raw_json)
-            fallback = ""
-            for c in data:
-                if str(c.get("class", "")).lower() != desk:
-                    continue
-                addr = c["address"]
-                if str(c.get("workspace", {}).get("id")) == str(ws):
-                    return addr
-                if not fallback:
-                    fallback = addr
-            return fallback
-        self.assertEqual(find(raw, "google-chrome", "2"), "0xbbbb")
-        self.assertEqual(find(raw, "google-chrome", "9"), "0xaaaa")
+        def pick(local, other, active):
+            for hit in local:
+                if hit["address"] != active:
+                    return hit["address"]
+            if other:
+                return other[0]["address"]
+            return local[0]["address"] if local else ""
+
+        local = [{"address": "0xbbbb", "workspace": "2"}]
+        other = [{"address": "0xaaaa", "workspace": "1"}]
+        self.assertEqual(pick(local, other, "0xffff"), "0xbbbb")
+        self.assertEqual(pick(local, other, "0xbbbb"), "0xaaaa")
+        self.assertEqual(pick([], other, ""), "0xaaaa")
+
+    def test_js_cycles_when_local_instance_is_focused(self):
+        self.assertIn("function pickClient(", ACTIONS)
+        self.assertIn("local[i].address !== active", ACTIONS)
 
     def test_lua_focus_dispatchers(self):
         self.assertIn('hl.dsp.focus({ window = "address:', ACTIONS)

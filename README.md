@@ -20,7 +20,9 @@ clipboard, screenshot, and more.
 * **Hold Super to arm** (on by default). Corners fire only while Super is
   held, so dragging a window to an edge does not trip them.
 * **Open or focus.** An app corner focuses an existing window if one exists,
-  and launches only when none is mapped.
+  preferring the current workspace. If that instance is already focused,
+  the next trigger jumps to another workspace that has the same app.
+  It launches only when none is mapped.
 * **Suppression.** Fullscreen, pointer-button drag, and the Omarchy menu /
   emoji / clipboard overlays do not fire corners.
 * **Power dwell.** Shut down and restart add extra dwell time, then still
