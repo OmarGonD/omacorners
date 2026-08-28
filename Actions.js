@@ -243,8 +243,21 @@ function classMatchesDesktop(klass, initialClass, desktopId) {
   return false
 }
 
+function canonicalAddress(addr) {
+  var s = String(addr || "").toLowerCase()
+  if (s.indexOf("0x") === 0) s = s.substring(2)
+  if (!/^[0-9a-f]{4,18}$/.test(s)) return ""
+  return "0x" + s
+}
+
 function isWindowAddress(addr) {
-  return typeof addr === "string" && /^0x[0-9a-fA-F]{4,18}$/.test(addr)
+  return canonicalAddress(addr) !== ""
+}
+
+function sameAddress(a, b) {
+  var left = canonicalAddress(a)
+  var right = canonicalAddress(b)
+  return left !== "" && left === right
 }
 
 function luaQuote(value) {
@@ -258,9 +271,10 @@ function focusWorkspaceDispatch(ws, usingLua) {
 }
 
 function focusWindowDispatch(addr, usingLua) {
-  if (!isWindowAddress(addr)) return ""
-  if (usingLua) return 'hl.dsp.focus({ window = "address:' + addr + '" })'
-  return "focuswindow address:" + addr
+  var canon = canonicalAddress(addr)
+  if (!canon) return ""
+  if (usingLua) return 'hl.dsp.focus({ window = "address:' + canon + '" })'
+  return "focuswindow address:" + canon
 }
 
 function classicToLua(classic) {
@@ -279,13 +293,18 @@ function historyRank(client) {
 }
 
 function pickClient(local, other, activeAddress) {
-  var active = String(activeAddress || "")
+  var active = canonicalAddress(activeAddress)
   var i
-  for (i = 0; i < local.length; i++) {
-    if (local[i].address !== active) return local[i]
+  if (active) {
+    for (i = 0; i < local.length; i++) {
+      if (!sameAddress(local[i].address, active)) return local[i]
+    }
+    if (other.length) return other[0]
+    return local.length ? local[0] : null
   }
-  if (other.length) return other[0]
-  return local.length ? local[0] : null
+  if (local.length && other.length && local[0].history === 0) return other[0]
+  if (local.length) return local[0]
+  return other.length ? other[0] : null
 }
 
 function findClient(rawJson, desktopId, workspaceKey, activeAddress) {
@@ -305,8 +324,8 @@ function findClient(rawJson, desktopId, workspaceKey, activeAddress) {
     if (!client || typeof client !== "object") continue
     if (client.mapped === false) continue
     if (!classMatchesDesktop(client["class"], client.initialClass, desk)) continue
-    var addr = String(client.address || "")
-    if (!isWindowAddress(addr)) continue
+    var addr = canonicalAddress(client.address)
+    if (!addr) continue
     var ws = client.workspace && client.workspace.id != null ? String(client.workspace.id) : ""
     var hit = { address: addr, workspace: isWorkspaceKey(ws) ? ws : "", history: historyRank(client) }
     if (wantWs && ws === wantWs) local.push(hit)

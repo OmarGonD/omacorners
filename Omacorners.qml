@@ -68,6 +68,8 @@ Item {
   property bool dragging: false
   property string focusDesktopId: ""
   property string focusAction: ""
+  property string focusActiveAddr: ""
+  property string focusFromWorkspace: ""
 
   property int cursorX: -100000
   property int cursorY: -100000
@@ -366,12 +368,22 @@ Item {
     Hyprland.dispatch(request)
   }
 
+  function activeWindowAddress() {
+    var top = Hyprland.activeToplevel
+    if (!top) return ""
+    var addr = top.address ? String(top.address) : ""
+    if (!addr && top.lastIpcObject && top.lastIpcObject.address)
+      addr = String(top.lastIpcObject.address)
+    return Actions.canonicalAddress(addr)
+  }
+
   function revealWindow(addr, ws) {
     if (!Actions.isWindowAddress(addr)) return
     var lua = Hyprland.usingLua === true
     var windowReq = Actions.focusWindowDispatch(addr, lua)
     if (!windowReq) return
-    if (ws && Actions.isWorkspaceKey(ws) && ws !== root.workspaceKey) {
+    var fromWs = focusFromWorkspace || root.workspaceKey
+    if (ws && Actions.isWorkspaceKey(ws) && ws !== fromWs) {
       var wsReq = Actions.focusWorkspaceDispatch(ws, lua)
       if (wsReq) hyprDispatch(wsReq)
     }
@@ -387,6 +399,8 @@ Item {
     if (clientsProc.running) clientsProc.running = false
     focusDesktopId = desk
     focusAction = action
+    focusActiveAddr = root.activeWindowAddress()
+    focusFromWorkspace = root.workspaceKey
     clientsProc.running = true
   }
 
@@ -549,11 +563,14 @@ Item {
     onExited: function(code) {
       var desk = root.focusDesktopId
       var action = root.focusAction
+      var activeAddr = root.focusActiveAddr
+      var fromWs = root.focusFromWorkspace
       root.focusDesktopId = ""
       root.focusAction = ""
+      root.focusActiveAddr = ""
+      root.focusFromWorkspace = ""
       if (!desk) return
-      var activeAddr = Hyprland.activeToplevel ? String(Hyprland.activeToplevel.address || "") : ""
-      var hit = code === 0 ? Actions.findClient(clientsOut.text, desk, root.workspaceKey, activeAddr) : null
+      var hit = code === 0 ? Actions.findClient(clientsOut.text, desk, fromWs, activeAddr) : null
       if (hit && hit.address) {
         root.revealWindow(hit.address, hit.workspace)
         return

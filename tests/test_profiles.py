@@ -76,7 +76,8 @@ class ClientMatchTests(unittest.TestCase):
 
     def test_js_cycles_when_local_instance_is_focused(self):
         self.assertIn("function pickClient(", ACTIONS)
-        self.assertIn("local[i].address !== active", ACTIONS)
+        self.assertIn("sameAddress(local[i].address, active)", ACTIONS)
+        self.assertIn("local[0].history === 0", ACTIONS)
 
     def test_lua_focus_dispatchers(self):
         self.assertIn('hl.dsp.focus({ window = "address:', ACTIONS)
@@ -88,7 +89,9 @@ class ClientMatchTests(unittest.TestCase):
         self.assertIn("function findClientAddress(", ACTIONS)
         self.assertIn("function findClient(", ACTIONS)
         self.assertIn("function isWindowAddress(", ACTIONS)
-        self.assertIn("0x[0-9a-fA-F]{4,18}", ACTIONS)
+        self.assertIn("function canonicalAddress(", ACTIONS)
+        self.assertIn("function sameAddress(", ACTIONS)
+        self.assertIn("^[0-9a-f]{4,18}$", ACTIONS)
         self.assertIn("workspace: isWorkspaceKey(ws)", ACTIONS)
 
     def test_fallback_keeps_workspace_id(self):
