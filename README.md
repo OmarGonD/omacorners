@@ -100,6 +100,7 @@ keybindings you added by hand are left in place.
 | Toggle bar | `omarchy-toggle-bar` |
 | Terminal | `omarchy-launch-terminal` |
 | Browser | `omarchy-launch-browser` |
+| Grok | `omarchy-agent` (focuses `org.omarchy.agent` if already open) |
 | Next / previous workspace | `workspace e+1` / `workspace e-1` |
 | Shut down | `omarchy-system-shutdown` (asks to confirm) |
 | Restart | `omarchy-system-reboot` (asks to confirm) |

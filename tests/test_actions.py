@@ -26,6 +26,7 @@ class ActionWhitelistTests(unittest.TestCase):
         self.assertIn("desktop", ids)
         self.assertIn("shutdown", ids)
         self.assertIn("reboot", ids)
+        self.assertIn("agent", ids)
         self.assertIn("settings", ids)
 
     def test_argv_entries_are_literal_arrays_of_strings(self):
@@ -50,6 +51,11 @@ class ActionWhitelistTests(unittest.TestCase):
     def test_normalize_unknown_is_none(self):
         self.assertIn("if (isAppAction(id)) return id", ACTIONS)
         self.assertIn('return "none"', ACTIONS)
+
+    def test_grok_agent_is_a_builtin(self):
+        self.assertIn('label: "Grok"', ACTIONS)
+        self.assertIn('["omarchy-agent"]', ACTIONS)
+        self.assertIn('focusClass: "org.omarchy.agent"', ACTIONS)
 
     def test_power_actions_use_omarchy_binaries(self):
         self.assertIn('["omarchy-system-shutdown"]', ACTIONS)

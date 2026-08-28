@@ -67,6 +67,7 @@ Item {
   property bool superSeen: false
   property bool dragging: false
   property string focusDesktopId: ""
+  property string focusAction: ""
 
   property int cursorX: -100000
   property int cursorY: -100000
@@ -341,8 +342,11 @@ Item {
   }
 
   function executeAction(action) {
-    if (Actions.isAppAction(action)) {
-      focusOrLaunch(Actions.desktopIdOf(action))
+    var matchId = Actions.isAppAction(action)
+      ? Actions.desktopIdOf(action)
+      : Actions.focusClassOf(action)
+    if (matchId) {
+      focusOrLaunch(matchId, action)
       return
     }
     Actions.run(action, function(dispatch) {
@@ -352,13 +356,19 @@ Item {
     })
   }
 
-  function focusOrLaunch(desktopId) {
-    var desk = Actions.normalizeDesktopId(desktopId)
-    if (!desk) return
-    if (clientsProc.running) {
-      clientsProc.running = false
+  function focusOrLaunch(matchId, action) {
+    var desk = Actions.normalizeDesktopId(matchId)
+    if (!desk) {
+      Actions.run(action, function(dispatch) {
+        Hyprland.dispatch(dispatch)
+      }, function(argv) {
+        Util.execArgv(argv)
+      })
+      return
     }
+    if (clientsProc.running) clientsProc.running = false
     focusDesktopId = desk
+    focusAction = action
     clientsProc.running = true
   }
 
@@ -520,14 +530,17 @@ Item {
     }
     onExited: function(code) {
       var desk = root.focusDesktopId
+      var action = root.focusAction
       root.focusDesktopId = ""
+      root.focusAction = ""
       if (!desk) return
       var addr = code === 0 ? Actions.findClientAddress(clientsOut.text, desk, root.workspaceKey) : ""
       if (addr) {
         Hyprland.dispatch("focuswindow address:" + addr)
         return
       }
-      Actions.run(Actions.appAction(desk), function(dispatch) {
+      var fallback = action || Actions.appAction(desk)
+      Actions.run(fallback, function(dispatch) {
         Hyprland.dispatch(dispatch)
       }, function(argv) {
         Util.execArgv(argv)

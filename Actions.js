@@ -21,6 +21,7 @@ var ORDER = [
   "bar",
   "terminal",
   "browser",
+  "agent",
   "workspace-next",
   "workspace-prev",
   "shutdown",
@@ -44,6 +45,7 @@ var META = {
   "bar": { label: "Toggle bar", kind: "argv", argv: ["omarchy-toggle-bar"] },
   "terminal": { label: "Terminal", kind: "argv", argv: ["omarchy-launch-terminal"] },
   "browser": { label: "Browser", kind: "argv", argv: ["omarchy-launch-browser"] },
+  "agent": { label: "Grok", kind: "argv", argv: ["omarchy-agent"], focusClass: "org.omarchy.agent" },
   "workspace-next": { label: "Next workspace", kind: "hypr", dispatch: "workspace e+1" },
   "workspace-prev": { label: "Previous workspace", kind: "hypr", dispatch: "workspace e-1" },
   "shutdown": { label: "Shut down", kind: "argv", argv: ["omarchy-system-shutdown"] },
@@ -216,6 +218,12 @@ function entryIsThin(entry) {
     return false
   }
   return true
+}
+
+function focusClassOf(id) {
+  if (!isBuiltin(id) || !META[id]) return ""
+  var klass = META[id].focusClass
+  return typeof klass === "string" ? klass : ""
 }
 
 function classMatchesDesktop(klass, initialClass, desktopId) {
