@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ACTIONS = (ROOT / "Actions.js").read_text(encoding="utf-8")
 
-DESKTOP_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")
+DESKTOP_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+\- ]{0,127}$")
 
 
 def is_desktop_id(value: str) -> bool:
@@ -32,7 +32,7 @@ def is_app_action(value: str) -> bool:
 
 class AppActionTests(unittest.TestCase):
     def test_accepts_chrome_ids(self):
-        for desk in ("google-chrome", "com.google.Chrome", "chromium"):
+        for desk in ("google-chrome", "com.google.Chrome", "chromium", "Google Contacts"):
             self.assertTrue(is_desktop_id(desk), desk)
             self.assertTrue(is_app_action("app:" + desk), desk)
             self.assertEqual(normalize_desktop_id(desk + ".desktop"), desk)
@@ -42,7 +42,6 @@ class AppActionTests(unittest.TestCase):
             "../etc/passwd",
             "foo/bar",
             "foo;rm",
-            "foo bar",
             "foo$(id)",
             "foo`id`",
             "",
@@ -52,7 +51,7 @@ class AppActionTests(unittest.TestCase):
             self.assertFalse(is_app_action("app:" + bad) if bad else is_app_action("app:"), bad)
 
     def test_js_keeps_the_same_desktop_id_pattern(self):
-        self.assertIn(r"/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/", ACTIONS)
+        self.assertIn(r"/^[A-Za-z0-9][A-Za-z0-9._+\- ]{0,127}$/", ACTIONS)
         self.assertIn('id.indexOf("..") !== -1', ACTIONS)
         self.assertIn('id.indexOf("/") !== -1', ACTIONS)
         self.assertIn("app:", ACTIONS)

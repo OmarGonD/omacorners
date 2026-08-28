@@ -45,7 +45,7 @@ var META = {
   "bar": { label: "Toggle bar", kind: "argv", argv: ["omarchy-toggle-bar"] },
   "terminal": { label: "Terminal", kind: "argv", argv: ["omarchy-launch-terminal"] },
   "browser": { label: "Browser", kind: "argv", argv: ["omarchy-launch-browser"] },
-  "agent": { label: "Grok", kind: "argv", argv: ["omarchy-agent"], focusClass: "org.omarchy.agent" },
+  "agent": { label: "Default agent", kind: "argv", argv: ["omarchy-agent"], focusClass: "org.omarchy.agent" },
   "workspace-next": { label: "Next workspace", kind: "hypr", dispatch: "workspace e+1" },
   "workspace-prev": { label: "Previous workspace", kind: "hypr", dispatch: "workspace e-1" },
   "shutdown": { label: "Shut down", kind: "argv", argv: ["omarchy-system-shutdown"] },
@@ -53,12 +53,47 @@ var META = {
   "settings": { label: "Omacorners settings", kind: "argv", argv: ["omarchy-shell", "shell", "toggle", "io.github.omargond.omacorners"] }
 }
 
-var DESKTOP_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
+var DESKTOP_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+\- ]{0,127}$/
+
+var AGENT_IDS = {
+  "agy": { label: "Antigravity", argv: ["agy", "--dangerously-skip-permissions"] },
+  "claude": { label: "Claude", argv: ["claude", "--permission-mode", "auto"] },
+  "codex": { label: "Codex", argv: ["codex", "--approve-for-me"] },
+  "copilot": { label: "Copilot", argv: ["copilot", "--allow-all"] },
+  "crush": { label: "Crush", argv: ["crush", "--yolo"] },
+  "grok": { label: "Grok", argv: ["grok", "--permission-mode", "bypassPermissions"] },
+  "omp": { label: "omp", argv: ["omp", "--auto-approve"] },
+  "opencode": { label: "OpenCode", argv: ["opencode", "--auto"] },
+  "ori": { label: "Ori", argv: ["ori", "code"] },
+  "pi": { label: "Pi", argv: ["pi"] }
+}
+
+var AGENT_NAME_PATTERN = /^[a-z][a-z0-9]{0,31}$/
 
 function isDesktopId(id) {
   if (typeof id !== "string" || id.length === 0 || id.length > 128) return false
-  if (id.indexOf("..") !== -1 || id.indexOf("/") !== -1) return false
+  if (id.indexOf("..") !== -1) return false
+  if (id.indexOf("/") !== -1 || id.indexOf("\\") !== -1) return false
+  if (/[\n\r\0;|$`&<>'"()]/.test(id)) return false
   return DESKTOP_ID_PATTERN.test(id)
+}
+
+function isAgentName(id) {
+  return typeof id === "string" && AGENT_NAME_PATTERN.test(id) && AGENT_IDS[id] !== undefined
+}
+
+function isAgentAction(id) {
+  return typeof id === "string" && id.indexOf("agent:") === 0 && isAgentName(id.substring(6))
+}
+
+function agentNameOf(id) {
+  return isAgentAction(id) ? id.substring(6) : ""
+}
+
+function agentArgv(name) {
+  if (!isAgentName(name)) return null
+  var spec = AGENT_IDS[name]
+  return ["omarchy-launch-tui", "--app-id=org.omarchy.agent." + name].concat(spec.argv.slice())
 }
 
 function normalizeDesktopId(id) {
@@ -85,17 +120,19 @@ function isBuiltin(id) {
 }
 
 function isAction(id) {
-  return isBuiltin(id) || isAppAction(id)
+  return isBuiltin(id) || isAppAction(id) || isAgentAction(id)
 }
 
 function normalize(id) {
   if (isBuiltin(id)) return id
   if (isAppAction(id)) return id
+  if (isAgentAction(id)) return id
   return "none"
 }
 
 function labelOf(id) {
   if (isAppAction(id)) return desktopIdOf(id)
+  if (isAgentAction(id)) return AGENT_IDS[agentNameOf(id)].label
   return META[normalize(id)].label
 }
 
@@ -121,6 +158,15 @@ function options() {
   for (var i = 0; i < ORDER.length; i++) {
     var id = ORDER[i]
     out.push({ value: id, label: META[id].label })
+  }
+  var names = []
+  for (var name in AGENT_IDS) {
+    if (AGENT_IDS.hasOwnProperty(name)) names.push(name)
+  }
+  names.sort()
+  for (var n = 0; n < names.length; n++) {
+    var agent = names[n]
+    out.push({ value: "agent:" + agent, label: AGENT_IDS[agent].label })
   }
   return out
 }
@@ -225,6 +271,7 @@ function entryIsThin(entry) {
 }
 
 function focusClassOf(id) {
+  if (isAgentAction(id)) return "org.omarchy.agent." + agentNameOf(id)
   if (!isBuiltin(id) || !META[id]) return ""
   var klass = META[id].focusClass
   return typeof klass === "string" ? klass : ""
@@ -349,6 +396,13 @@ function run(id, hyprDispatch, execArgv) {
     var desktop = desktopIdOf(id)
     if (!desktop) return false
     execArgv(["uwsm-app", "--", "gtk-launch", desktop + ".desktop"])
+    return true
+  }
+  if (isAgentAction(id)) {
+    if (typeof execArgv !== "function") return false
+    var argv = agentArgv(agentNameOf(id))
+    if (!argv) return false
+    execArgv(argv)
     return true
   }
   var meta = META[id]

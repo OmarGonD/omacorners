@@ -56,6 +56,9 @@ class ActionWhitelistTests(unittest.TestCase):
         self.assertIn('label: "Grok"', ACTIONS)
         self.assertIn('["omarchy-agent"]', ACTIONS)
         self.assertIn('focusClass: "org.omarchy.agent"', ACTIONS)
+        self.assertIn('"claude": { label: "Claude"', ACTIONS)
+        self.assertIn("isAgentAction", ACTIONS)
+        self.assertIn("org.omarchy.agent.claude", ACTIONS)
 
     def test_power_actions_use_omarchy_binaries(self):
         self.assertIn('["omarchy-system-shutdown"]', ACTIONS)

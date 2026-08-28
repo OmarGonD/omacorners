@@ -102,16 +102,17 @@ keybindings you added by hand are left in place.
 | Toggle bar | `omarchy-toggle-bar` |
 | Terminal | `omarchy-launch-terminal` |
 | Browser | `omarchy-launch-browser` |
-| Grok | `omarchy-agent` (focuses `org.omarchy.agent` if already open) |
+| Default agent | `omarchy-agent` |
+| Claude, Grok, Codex, … | `omarchy-launch-tui --app-id=org.omarchy.agent.<name> …` |
 | Next / previous workspace | `workspace e+1` / `workspace e-1` |
 | Shut down | `omarchy-system-shutdown` (asks to confirm) |
 | Restart | `omarchy-system-reboot` (asks to confirm) |
 | An installed app | `uwsm-app -- gtk-launch <desktop-id>.desktop` |
 | Omacorners settings | this overlay |
 
-Search a corner's dropdown for an app name (for example "Chrome") to assign
-it. Application ids are stored as `app:<desktop-id>` after the id is checked
-against a strict desktop-file pattern. Shut down and Restart open a confirm
+Search a corner's dropdown for an app or agent name (Chrome, Claude, Grok,
+Codex, …). Desktop apps are stored as `app:<desktop-id>`; coding agents as
+`agent:<name>` from a fixed list. Shut down and Restart open a confirm
 dialog before they run.
 
 Unknown values in `shell.json` normalize to **None**. There is no free-form
