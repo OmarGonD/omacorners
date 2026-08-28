@@ -356,6 +356,13 @@ Item {
     })
   }
 
+  function revealWindow(addr, ws) {
+    if (!Actions.isWindowAddress(addr)) return
+    if (ws && Actions.isWorkspaceKey(ws) && ws !== root.workspaceKey)
+      Hyprland.dispatch("workspace " + ws)
+    Hyprland.dispatch("focuswindow address:" + addr)
+  }
+
   function focusOrLaunch(matchId, action) {
     var desk = Actions.normalizeDesktopId(matchId)
     if (!desk) {
@@ -534,9 +541,9 @@ Item {
       root.focusDesktopId = ""
       root.focusAction = ""
       if (!desk) return
-      var addr = code === 0 ? Actions.findClientAddress(clientsOut.text, desk, root.workspaceKey) : ""
-      if (addr) {
-        Hyprland.dispatch("focuswindow address:" + addr)
+      var hit = code === 0 ? Actions.findClient(clientsOut.text, desk, root.workspaceKey) : null
+      if (hit && hit.address) {
+        root.revealWindow(hit.address, hit.workspace)
         return
       }
       var fallback = action || Actions.appAction(desk)

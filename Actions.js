@@ -243,16 +243,16 @@ function isWindowAddress(addr) {
   return typeof addr === "string" && /^0x[0-9a-fA-F]{4,18}$/.test(addr)
 }
 
-function findClientAddress(rawJson, desktopId, workspaceKey) {
+function findClient(rawJson, desktopId, workspaceKey) {
   var desk = normalizeDesktopId(desktopId)
-  if (!desk) return ""
+  if (!desk) return null
   var list
-  try { list = JSON.parse(String(rawJson || "")) } catch (e) { return "" }
-  if (!Array.isArray(list)) return ""
+  try { list = JSON.parse(String(rawJson || "")) } catch (e) { return null }
+  if (!Array.isArray(list)) return null
   var n = list.length
-  if (typeof n !== "number" || n < 0) return ""
+  if (typeof n !== "number" || n < 0) return null
   if (n > 256) n = 256
-  var fallback = ""
+  var fallback = null
   var wantWs = workspaceKey ? String(workspaceKey) : ""
   for (var i = 0; i < n; i++) {
     var client = list[i]
@@ -262,10 +262,16 @@ function findClientAddress(rawJson, desktopId, workspaceKey) {
     var addr = String(client.address || "")
     if (!isWindowAddress(addr)) continue
     var ws = client.workspace && client.workspace.id != null ? String(client.workspace.id) : ""
-    if (wantWs && ws === wantWs) return addr
-    if (!fallback) fallback = addr
+    var hit = { address: addr, workspace: isWorkspaceKey(ws) ? ws : "" }
+    if (wantWs && ws === wantWs) return hit
+    if (!fallback) fallback = hit
   }
   return fallback
+}
+
+function findClientAddress(rawJson, desktopId, workspaceKey) {
+  var hit = findClient(rawJson, desktopId, workspaceKey)
+  return hit ? hit.address : ""
 }
 
 function run(id, hyprDispatch, execArgv) {

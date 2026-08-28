@@ -86,8 +86,21 @@ class ClientMatchTests(unittest.TestCase):
 
     def test_js_exports_find_client_address(self):
         self.assertIn("function findClientAddress(", ACTIONS)
+        self.assertIn("function findClient(", ACTIONS)
         self.assertIn("function isWindowAddress(", ACTIONS)
         self.assertIn("0x[0-9a-fA-F]{4,18}", ACTIONS)
+        self.assertIn("workspace: isWorkspaceKey(ws)", ACTIONS)
+
+    def test_fallback_keeps_workspace_id(self):
+        import json
+        raw = json.dumps([
+            {"class": "org.omarchy.agent", "initialClass": "org.omarchy.agent",
+             "address": "0xaaaa", "mapped": True, "workspace": {"id": 1}},
+        ])
+        data = json.loads(raw)
+        c = data[0]
+        self.assertEqual(str(c["workspace"]["id"]), "1")
+        self.assertNotEqual(str(c["workspace"]["id"]), "2")
 
 
 if __name__ == "__main__":
