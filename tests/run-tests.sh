@@ -2,5 +2,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 -m unittest discover -s tests -v
-python3 -m py_compile scripts/hotcorners-cursor
+python3 -m py_compile scripts/omacorners-cursor
 omarchy plugin validate .

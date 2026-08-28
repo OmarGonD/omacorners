@@ -1,4 +1,4 @@
-# Hot Corners
+# Omacorners
 
 **macOS-style hot corners for [Omarchy](https://omarchy.org/).**
 
@@ -6,7 +6,7 @@ Move the pointer into a screen corner, wait the dwell delay, and Omarchy runs
 the action you assigned: lock, screensaver, show desktop, menu, notifications,
 clipboard, screenshot, and more.
 
-![Hot Corners settings overlay](preview.png)
+![Omacorners settings overlay](preview.png)
 
 ---
 
@@ -19,47 +19,47 @@ clipboard, screenshot, and more.
 * **Corner glow.** An accent blob grows at the corner while you dwell, then
   pulses when the action runs. Click-through overlay — it never steals input.
 * **Show desktop.** Toggles an empty Hyprland special workspace named
-  `hotcorners`, so windows stay where they were.
+  `omacorners`, so windows stay where they were.
 * **Settings overlay.** Visual screen diagram, four dropdowns, delay and
   corner-size sliders, and a pause toggle that keeps your assignments.
 
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/OmarGonD/omarchy-hotcorners.git --enable
+omarchy plugin add https://github.com/OmarGonD/omacorners.git --enable
 omarchy restart shell
 ```
 
 Open settings:
 
 ```bash
-omarchy-shell shell toggle io.github.omargond.hotcorners
+omarchy-shell shell toggle io.github.omargond.omacorners
 ```
 
 Or from the Omarchy menu, add this to
 `~/.config/omarchy/extensions/omarchy-menu.jsonc`:
 
 ```jsonc
-"setup.hotcorners": {
+"setup.omacorners": {
   "icon": "󰝥",
-  "label": "Hot Corners",
-  "aliases": ["hotcorners", "hot-corners"],
+  "label": "Omacorners",
+  "aliases": ["hotcorners", "hot-corners", "omacorners"],
   "description": "Assign an action to each screen corner",
-  "action": "omarchy-shell shell toggle io.github.omargond.hotcorners"
+  "action": "omarchy-shell shell toggle io.github.omargond.omacorners"
 }
 ```
 
 A keybind, if you want one, in `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + SHIFT + H", "Hot Corners", "omarchy-shell shell toggle io.github.omargond.hotcorners")
+o.bind("SUPER + SHIFT + H", "Omacorners", "omarchy-shell shell toggle io.github.omargond.omacorners")
 ```
 
 ## Enable or Disable
 
 ```bash
-omarchy plugin enable io.github.omargond.hotcorners
-omarchy plugin disable io.github.omargond.hotcorners
+omarchy plugin enable io.github.omargond.omacorners
+omarchy plugin disable io.github.omargond.omacorners
 ```
 
 The settings overlay also has an **Enabled** switch that pauses corner
@@ -72,7 +72,7 @@ detection without dropping your assignments.
 | None | — |
 | Lock screen | `omarchy-system-lock` |
 | Screensaver | `omarchy-launch-screensaver force` |
-| Show desktop | `hyprctl dispatch togglespecialworkspace hotcorners` |
+| Show desktop | `hyprctl dispatch togglespecialworkspace omacorners` |
 | Omarchy menu | `omarchy-menu toggle` |
 | Notification history | `omarchy-shell notifications showHistory` |
 | Clipboard history | `omarchy-shell shell toggle omarchy.clipboard` |
@@ -85,7 +85,7 @@ detection without dropping your assignments.
 | Terminal | `omarchy-launch-terminal` |
 | Browser | `omarchy-launch-browser` |
 | Next / previous workspace | `workspace e+1` / `workspace e-1` |
-| Hot Corners settings | this overlay |
+| Omacorners settings | this overlay |
 
 Unknown values in `shell.json` normalize to **None**. There is no free-form
 command field.
@@ -101,7 +101,7 @@ Stored on the plugin's entry in `~/.config/omarchy/shell.json`:
 | `thresholdPx` | `8` | Corner hit size in layout pixels, 2–48 |
 | `topLeft` / `topRight` / `bottomLeft` / `bottomRight` | `none` | Action ids from the table above |
 
-IPC for debugging: `omarchy-shell hotcorners status`
+IPC for debugging: `omarchy-shell omacorners status`
 
 ## Architecture & Security
 
@@ -119,8 +119,8 @@ IPC for debugging: `omarchy-shell hotcorners status`
   They are not logged, persisted, or sent anywhere.
 
 The plugin runs unsandboxed inside `omarchy-shell`, like every Omarchy plugin.
-Read `HotCorners.qml`, `Actions.js`, `Corners.js`, `Settings.qml`, and
-`scripts/hotcorners-cursor` before enabling.
+Read `Omacorners.qml`, `Actions.js`, `Corners.js`, `Settings.qml`, and
+`scripts/omacorners-cursor` before enabling.
 
 ## Requirements
 
@@ -138,9 +138,9 @@ omarchy plugin validate .
 Symlink into the live plugin dir and restart the shell after edits:
 
 ```bash
-ln -sfn "$PWD" ~/.config/omarchy/plugins/io.github.omargond.hotcorners
+ln -sfn "$PWD" ~/.config/omarchy/plugins/io.github.omargond.omacorners
 omarchy-shell shell rescanPlugins
-omarchy plugin enable io.github.omargond.hotcorners
+omarchy plugin enable io.github.omargond.omacorners
 omarchy restart shell
 ```
 

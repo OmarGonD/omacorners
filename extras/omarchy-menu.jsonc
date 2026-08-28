@@ -1,10 +1,10 @@
 {
   // Merge into ~/.config/omarchy/extensions/omarchy-menu.jsonc
-  "setup.hotcorners": {
+  "setup.omacorners": {
     "icon": "󰝥",
-    "label": "Hot Corners",
-    "aliases": ["hotcorners", "hot-corners"],
+    "label": "Omacorners",
+    "aliases": ["hotcorners", "hot-corners", "omacorners"],
     "description": "Assign an action to each screen corner",
-    "action": "omarchy-shell shell toggle io.github.omargond.hotcorners"
+    "action": "omarchy-shell shell toggle io.github.omargond.omacorners"
   }
 }

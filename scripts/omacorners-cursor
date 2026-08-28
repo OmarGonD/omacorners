@@ -159,7 +159,7 @@ def emit_pos(x: int, y: int) -> None:
 def main() -> int:
     path = find_socket()
     if not path:
-        sys.stderr.write("hotcorners-cursor: Hyprland request socket not found\n")
+        sys.stderr.write("omacorners-cursor: Hyprland request socket not found\n")
         return 1
 
     last_pos: tuple[int, int] | None = None

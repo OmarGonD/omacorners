@@ -8,11 +8,11 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-HELPER = ROOT / "scripts" / "hotcorners-cursor"
+HELPER = ROOT / "scripts" / "omacorners-cursor"
 
 
 def load_helper():
-    loader = SourceFileLoader("hotcorners_cursor", str(HELPER))
+    loader = SourceFileLoader("omacorners_cursor", str(HELPER))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     mod = importlib.util.module_from_spec(spec)
     loader.exec_module(mod)
@@ -72,7 +72,7 @@ class CursorHelperTests(unittest.TestCase):
 
     def test_find_socket_accepts_unix_socket(self):
         with tempfile.TemporaryDirectory() as tmp:
-            sig = "testsig_hotcorners"
+            sig = "testsig_omacorners"
             sock_dir = Path(tmp) / "hypr" / sig
             sock_dir.mkdir(parents=True)
             sock_path = sock_dir / ".socket.sock"

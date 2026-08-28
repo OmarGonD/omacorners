@@ -29,7 +29,7 @@ var META = {
   "none": { label: "None", kind: "none" },
   "lock": { label: "Lock screen", kind: "argv", argv: ["omarchy-system-lock"] },
   "screensaver": { label: "Screensaver", kind: "argv", argv: ["omarchy-launch-screensaver", "force"] },
-  "desktop": { label: "Show desktop", kind: "hypr", dispatch: "togglespecialworkspace hotcorners" },
+  "desktop": { label: "Show desktop", kind: "hypr", dispatch: "togglespecialworkspace omacorners" },
   "menu": { label: "Omarchy menu", kind: "argv", argv: ["omarchy-menu", "toggle"] },
   "notifications": { label: "Notification history", kind: "argv", argv: ["omarchy-shell", "notifications", "showHistory"] },
   "clipboard": { label: "Clipboard history", kind: "argv", argv: ["omarchy-shell", "shell", "toggle", "omarchy.clipboard"] },
@@ -43,7 +43,7 @@ var META = {
   "browser": { label: "Browser", kind: "argv", argv: ["omarchy-launch-browser"] },
   "workspace-next": { label: "Next workspace", kind: "hypr", dispatch: "workspace e+1" },
   "workspace-prev": { label: "Previous workspace", kind: "hypr", dispatch: "workspace e-1" },
-  "settings": { label: "Hot Corners settings", kind: "argv", argv: ["omarchy-shell", "shell", "toggle", "io.github.omargond.hotcorners"] }
+  "settings": { label: "Omacorners settings", kind: "argv", argv: ["omarchy-shell", "shell", "toggle", "io.github.omargond.omacorners"] }
 }
 
 function isAction(id) {

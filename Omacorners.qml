@@ -13,12 +13,12 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "io.github.omargond.hotcorners"
+  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "io.github.omargond.omacorners"
   readonly property string pluginDir: {
     var url = Qt.resolvedUrl(".")
     return url.toString().replace(/^file:\/\//, "").replace(/\/$/, "")
   }
-  readonly property string helperPath: pluginDir + "/scripts/hotcorners-cursor"
+  readonly property string helperPath: pluginDir + "/scripts/omacorners-cursor"
 
   readonly property var pluginEntry: {
     var cfg = shell ? shell.shellConfig : null
@@ -208,7 +208,7 @@ Item {
       root.persist({ welcomed: true })
       Quickshell.execDetached([
         "omarchy-notification-send",
-        "Hot Corners is on",
+        "Omacorners is on",
         "Open settings to assign an action to each screen corner."
       ])
     }
@@ -269,7 +269,7 @@ Item {
       splitMarker: "\n"
       onRead: function(data) {
         var line = String(data || "").trim()
-        if (line) console.warn("hotcorners-cursor: " + line)
+        if (line) console.warn("omacorners-cursor: " + line)
       }
     }
 
@@ -278,7 +278,7 @@ Item {
       if (!root.active) return
       root.helperRestarts += 1
       if (root.helperRestarts > 12) {
-        console.warn("hotcorners: helper gave up after repeated exits, code " + code)
+        console.warn("omacorners: helper gave up after repeated exits, code " + code)
         return
       }
       helperRestartTimer.restart()
@@ -286,7 +286,7 @@ Item {
   }
 
   IpcHandler {
-    target: "hotcorners"
+    target: "omacorners"
     function ping(): string { return "ok" }
     function status(): string {
       return JSON.stringify({
@@ -322,7 +322,7 @@ Item {
       visible: true
       color: "transparent"
       exclusionMode: ExclusionMode.Ignore
-      WlrLayershell.namespace: "hotcorners-glow"
+      WlrLayershell.namespace: "omacorners-glow"
       WlrLayershell.layer: WlrLayer.Overlay
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
       anchors { top: true; bottom: true; left: true; right: true }

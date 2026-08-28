@@ -11,8 +11,9 @@ MANIFEST = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
 
 class ActionWhitelistTests(unittest.TestCase):
     def test_plugin_id_matches_manifest_and_settings_action(self):
-        self.assertEqual(MANIFEST["id"], "io.github.omargond.hotcorners")
-        self.assertIn("io.github.omargond.hotcorners", ACTIONS)
+        self.assertEqual(MANIFEST["id"], "io.github.omargond.omacorners")
+        self.assertEqual(MANIFEST["name"], "Omacorners")
+        self.assertIn("io.github.omargond.omacorners", ACTIONS)
 
     def test_order_and_meta_keys_match(self):
         order = re.search(r"var ORDER = \[([\s\S]+?)\]", ACTIONS)

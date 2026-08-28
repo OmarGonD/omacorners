@@ -18,7 +18,7 @@ Item {
   property int delayPreview: -1
   property int thresholdPreview: -1
 
-  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "io.github.omargond.hotcorners"
+  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "io.github.omargond.omacorners"
   readonly property var svc: service
   readonly property bool ready: svc !== null && svc !== undefined
 
@@ -76,7 +76,7 @@ Item {
     visible: root.opened
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
-    WlrLayershell.namespace: "hotcorners-settings"
+    WlrLayershell.namespace: "omacorners-settings"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     exclusionMode: ExclusionMode.Ignore
@@ -129,7 +129,7 @@ Item {
           spacing: Style.space(4)
 
           Text {
-            text: "Hot Corners"
+            text: "Omacorners"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
@@ -347,7 +347,7 @@ Item {
 
         Text {
           Layout.fillWidth: true
-          text: "Esc closes this panel. Super+Space, then search Hot Corners."
+          text: "Esc closes this panel. Super+Space, then search Omacorners."
           color: root.foreground
           opacity: 0.45
           wrapMode: Text.WordWrap
