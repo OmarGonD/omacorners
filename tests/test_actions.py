@@ -19,7 +19,9 @@ class ActionWhitelistTests(unittest.TestCase):
         order = re.search(r"var ORDER = \[([\s\S]+?)\]", ACTIONS)
         self.assertIsNotNone(order)
         ids = re.findall(r'"([^"]+)"', order.group(1))
-        meta_keys = re.findall(r'^\s+"([^"]+)": \{', ACTIONS, re.M)
+        meta = re.search(r"var META = \{([\s\S]+?)\n\}", ACTIONS)
+        self.assertIsNotNone(meta)
+        meta_keys = re.findall(r'^\s+"([^"]+)": \{', meta.group(1), re.M)
         self.assertEqual(ids, meta_keys)
         self.assertEqual(ids[0], "none")
         self.assertIn("lock", ids)
@@ -58,7 +60,7 @@ class ActionWhitelistTests(unittest.TestCase):
         self.assertIn('focusClass: "org.omarchy.agent"', ACTIONS)
         self.assertIn('"claude": { label: "Claude"', ACTIONS)
         self.assertIn("isAgentAction", ACTIONS)
-        self.assertIn("org.omarchy.agent.claude", ACTIONS)
+        self.assertIn('"--app-id=org.omarchy.agent." + name', ACTIONS)
 
     def test_power_actions_use_omarchy_binaries(self):
         self.assertIn('["omarchy-system-shutdown"]', ACTIONS)
