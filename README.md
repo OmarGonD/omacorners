@@ -39,6 +39,23 @@ omarchy plugin add https://github.com/OmarGonD/omacorners.git --enable
 omarchy restart shell
 ```
 
+For **Hold Super to arm** on Lua-based Hyprland, add this line to
+`~/.config/hypr/bindings.lua` (once), then reload Hyprland:
+
+```lua
+dofile(os.getenv("HOME") .. "/.config/omarchy/plugins/io.github.omargond.omacorners/extras/hyprland-super.lua")
+```
+
+```bash
+hyprctl reload
+hyprctl configerrors
+```
+
+The bindings report left/right Super presses and releases without consuming
+those keys. Releasing both keys cancels a pending corner. If the modifier
+state is unavailable, corners stay blocked while **Hold Super to arm** is on.
+Users upgrading from an earlier version must also add this binding file.
+
 Open settings:
 
 ```bash
@@ -81,7 +98,8 @@ omarchy plugin remove io.github.omargond.omacorners
 ```
 
 Deletes the plugin checkout and its `shell.json` entry. Menu rows or
-keybindings you added by hand are left in place.
+keybindings you added by hand are left in place. Remove the `dofile` line
+above before removing the plugin.
 
 ## Actions
 
@@ -139,10 +157,11 @@ IPC for debugging: `omarchy-shell omacorners status`
 
 ## Architecture & Security
 
-* **No extra permissions.** The helper talks only to Hyprland's local request
-  socket (`$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock`)
-  for `cursorpos` and `j/monitors`. It never opens `/dev/input`, never injects
-  input, and never elevates privileges.
+* **No elevated permissions.** Super is reported by non-consuming compositor
+  bindings on Lua-based Hyprland. On older sessions, the helper can read
+  already-accessible input devices without grabbing them; it never requests
+  broader device access. The helper uses Hyprland's local request socket (`$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock`)
+  for `cursorpos` and `j/monitors`. It never injects input or elevates privileges.
 * **No network.** No HTTP, no analytics, no remote dependencies.
 * **No shell interpolation.** Every action is a constant argv vector or a
   constant Hyprland dispatcher string. User-edited action ids that are not on
@@ -161,6 +180,7 @@ Read `Omacorners.qml`, `Actions.js`, `Corners.js`, `Settings.qml`, and
 * Omarchy 4.x with Quickshell
 * Hyprland (the running compositor)
 * `python3` (standard library only)
+* Node.js for development tests
 
 ## Development
 

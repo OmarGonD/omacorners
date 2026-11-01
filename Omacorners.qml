@@ -22,7 +22,7 @@ Item {
   readonly property string helperPath: pluginDir + "/scripts/omacorners-cursor"
 
   readonly property var pluginEntry: {
-    var cfg = shell ? shell.shellConfig : null
+    var cfg = shell ? (shell.shellConfig || { bar: shell.barConfig }) : null
     var pluginRec = ({})
     var list = cfg && Array.isArray(cfg.plugins) ? cfg.plugins : []
     for (var i = 0; i < list.length; i++) {
@@ -30,7 +30,7 @@ Item {
     }
     var barRec = ({})
     var layout = cfg && cfg.bar && cfg.bar.layout ? cfg.bar.layout : null
-    var sections = ["left", "center", "right"]
+    var sections = ["left", "centerBegin", "center", "centerEnd", "right", "tray"]
     if (layout) {
       for (var s = 0; s < sections.length; s++) {
         var arr = layout[sections[s]] || []
@@ -63,7 +63,9 @@ Item {
 
   property var actionOptions: []
   property string pendingPower: ""
-  property bool superArmed: true
+  property bool superArmed: false
+  property bool leftSuperHeld: false
+  property bool rightSuperHeld: false
   property bool superSeen: false
   property bool dragging: false
   property string focusDesktopId: ""
@@ -209,15 +211,18 @@ Item {
     if (entry.thresholdPx !== undefined) entry.thresholdPx = Corners.clampThresholdPx(entry.thresholdPx)
     if (entry.powerDelayMs !== undefined) entry.powerDelayMs = Actions.clampPowerDelayMs(entry.powerDelayMs)
     if (entry.workspaces !== undefined) entry.workspaces = Actions.normalizeWorkspaceMap(entry.workspaces)
+    // Installed plugins receive a scoped shell facade. Its generic mutator
+    // is reserved for full-bar plugins; ordinary plugins save their own entry.
+    if (shell && typeof shell.updateEntryInline === "function") {
+      shell.updateEntryInline(pluginId, entry)
+      return
+    }
     if (shell && typeof shell.mutateShellConfig === "function") {
       var payload = JSON.parse(JSON.stringify(entry))
       shell.mutateShellConfig(function(config) {
         root.writeEntryInto(config, payload)
       })
-      return
     }
-    if (shell && typeof shell.updateEntryInline === "function")
-      shell.updateEntryInline(pluginId, entry)
   }
 
   function writeEntryInto(config, entry) {
@@ -230,7 +235,7 @@ Item {
       }
     }
     var layout = config.bar && config.bar.layout ? config.bar.layout : null
-    var sections = ["left", "center", "right"]
+    var sections = ["left", "centerBegin", "center", "centerEnd", "right", "tray"]
     if (layout) {
       for (var s = 0; s < sections.length; s++) {
         var arr = layout[sections[s]] || []
@@ -294,10 +299,20 @@ Item {
     dwellProgress = 0
   }
 
+  function setSuperKey(key, down) {
+    if (key !== "left" && key !== "right") return
+    if (key === "left") leftSuperHeld = down
+    else rightSuperHeld = down
+    superSeen = true
+    superArmed = leftSuperHeld || rightSuperHeld
+    if (requireSuper && !superArmed) clearDwell()
+    else onCursor(cursorX, cursorY)
+  }
+
   function blocked() {
     if (!active) return true
     if (pendingPower !== "") return true
-    if (requireSuper && superSeen && !superArmed) return true
+    if (requireSuper && !superArmed) return true
     if (suppressDrag && dragging) return true
     if (suppressFullscreen && fullscreenActive) return true
     if (suppressOverlay && overlayBlocking()) return true
@@ -405,7 +420,7 @@ Item {
   }
 
   function fire() {
-    if (!active || latched || dwellCorner === "" || pendingPower !== "") return
+    if (blocked() || latched || dwellCorner === "") return
     var action = actionForCorner(dwellCorner)
     if (action === "none") return
     latched = true
@@ -513,8 +528,11 @@ Item {
       onRead: function(data) {
         var line = String(data || "").trim()
         if (line === "ARM 1" || line === "ARM 0") {
+          // Lua sessions use compositor keybindings, without raw input access.
+          if (Hyprland.usingLua) return
           root.superSeen = true
           root.superArmed = line === "ARM 1"
+          if (root.requireSuper && !root.superArmed) root.clearDwell()
           return
         }
         if (line === "DRAG 1" || line === "DRAG 0") {
@@ -581,6 +599,10 @@ Item {
 
   IpcHandler {
     target: "omacorners"
+    function superKey(key: string, state: string): string {
+      root.setSuperKey(key, state === "1")
+      return "ok"
+    }
     function ping(): string { return "ok" }
     function status(): string {
       return JSON.stringify({
